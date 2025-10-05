@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Plataforma Anti-Phishing</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../static/css/login.css">
+</head>
+<body>
+    <div class="container-fluid vh-100">
+        <div class="row h-100">
+            <!-- Lado izquierdo - Branding -->
+            <div class="col-md-6 bg-primary d-none d-md-flex align-items-center justify-content-center text-white">
+                <div class="text-center">
+                    <h1 class="display-4 fw-bold mb-4">Solución AntiPhishing</h1>
+                    <p class="lead">Plataforma de Detección y Takedown de Sitios Fraudulentos</p>
+                    <p class="text-white-50">Protegiendo instituciones en Guatemala</p>
+                </div>
+            </div>
+
+            <!-- Lado derecho - Formulario -->
+            <div class="col-md-6 d-flex align-items-center justify-content-center">
+                <div class="login-form">
+                    <h2 class="text-center mb-4">Iniciar Sesión</h2>
+                    
+                    <div id="alertBox"></div>
+
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Usuario</label>
+                            <input type="text" class="form-control form-control-lg" id="username" 
+                                   placeholder="Ingrese su usuario" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Contraseña</label>
+                            <input type="password" class="form-control form-control-lg" id="password" 
+                                   placeholder="Ingrese su contraseña" required>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-lg w-100" id="loginBtn">
+                            <span id="btnText">Ingresar</span>
+                            <span id="btnSpinner" class="spinner-border spinner-border-sm d-none" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </span>
+                        </button>
+                    </form>
+
+                    <div class="text-center mt-4">
+                        <small class="text-muted">Solución AntiPhishing PG2- 2025</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../static/js/login.js"></script>
+</body>
+</html>
