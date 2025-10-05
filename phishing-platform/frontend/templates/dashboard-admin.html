@@ -54,6 +54,16 @@
                                 🚨 Sitios Reportados
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" onclick="showSection('whitelist')">
+                                ✅ Whitelist
+                        </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" onclick="showSection('takedown')">
+                             📧 Takedown
+                        </a>
+                        </li>
                     </ul>
                 </div>
             </nav>
@@ -197,6 +207,73 @@
     </div>
 </div>
 
+<!-- Whitelist Section -->
+<div id="whitelistSection" class="content-section" style="display: none;">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">✅ Whitelist - URLs Legítimas</h1>
+        <button class="btn btn-success" onclick="showModalWhitelist()">
+            + Agregar a Whitelist
+        </button>
+    </div>
+
+    <div class="alert alert-info">
+        <strong>ℹ️ Información:</strong> Las URLs agregadas aquí no podrán ser reportadas como sitios maliciosos.
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>URL Protegida</th>
+                    <th>Descripción</th>
+                    <th>Fecha Agregado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tablaWhitelist">
+                <tr>
+                    <td colspan="6" class="text-center">Cargando...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Takedown Section -->
+<div id="takedownSection" class="content-section" style="display: none;">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">📧 Gestión de Takedowns</h1>
+    </div>
+
+    <div class="alert alert-warning">
+        <strong>⚠️ Nota:</strong> Los takedowns solo se pueden generar para sitios validados como maliciosos.
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Sitio</th>
+                    <th>Cliente</th>
+                    <th>Destinatario</th>
+                    <th>Estado</th>
+                    <th>Fecha Envío</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tablaTakedown">
+                <tr>
+                    <td colspan="7" class="text-center">Cargando...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
 <!-- Modal Crear/Editar Usuario -->
 <div class="modal fade" id="modalUsuario" tabindex="-1">
     <div class="modal-dialog">
@@ -331,6 +408,149 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-danger" onclick="reportarSitio()">Reportar Sitio</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Agregar/Editar Whitelist -->
+<div class="modal fade" id="modalWhitelist" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="tituloModalWhitelist">Agregar URL a Whitelist</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formWhitelist">
+                    <input type="hidden" id="whitelistId">
+                    <div class="mb-3">
+                        <label class="form-label">Cliente</label>
+                        <select class="form-select" id="whitelistCliente" required>
+                            <option value="">Seleccione el cliente...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">URL Legítima</label>
+                        <input type="text" class="form-control" id="whitelistUrl" required 
+                               placeholder="https://ejemplo.com o mail.ejemplo.com">
+                        <small class="text-muted">Puede ser un dominio completo o subdominio</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descripción (Opcional)</label>
+                        <textarea class="form-control" id="whitelistDescripcion" rows="2" 
+                                  placeholder="Ej: Portal oficial de clientes, Subdominio de soporte técnico..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="guardarWhitelist()">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Generar Takedown -->
+<div class="modal fade" id="modalGenerarTakedown" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">📧 Generar Solicitud de Takedown</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formGenerarTakedown">
+                    <input type="hidden" id="takedownSitioId">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Destinatario (Email Abuse)</label>
+                        <input type="email" class="form-control" id="takedownDestinatario" required 
+                               placeholder="abuse@proveedor.com">
+                        <small class="text-muted">Sugerencia: <span id="takedownSugerencia"></span></small>
+                    </div>
+                    
+                                    <div class="mb-3">
+                    <label class="form-label">
+                        <input type="checkbox" id="enviarATodos" checked onchange="toggleEnvioMasivo()">
+                        Enviar también a proveedores comunes
+                    </label>
+                    <div id="listaProveedoresComunes" class="alert alert-info mt-2">
+                        <small><strong>Se enviará CC a:</strong></small>
+                        <ul id="listaEmails" style="font-size: 0.85em; margin: 5px 0; padding-left: 20px;"></ul>
+                    </div>
+                </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Asunto</label>
+                        <input type="text" class="form-control" id="takedownAsunto" required readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Cuerpo del Email</label>
+                        <textarea class="form-control" id="takedownCuerpo" rows="15" required readonly></textarea>
+                        <small class="text-muted">Este es un template generado automáticamente. Puedes editarlo antes de enviarlo.</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="habilitarEdicion()">
+                            ✏️ Habilitar Edición
+                        </button>
+                        <button type="button" class="btn btn-info btn-sm" onclick="copiarAlPortapapeles()">
+                            📋 Copiar al Portapapeles
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" onclick="guardarTakedown()">Guardar Solicitud</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Ver Detalles Takedown -->
+<div class="modal fade" id="modalVerTakedown" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">📄 Detalles del Takedown</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <strong>Destinatario:</strong> <span id="verDestinatario"></span>
+                </div>
+                <div class="mb-3">
+                    <strong>Asunto:</strong><br>
+                    <code id="verAsunto"></code>
+                </div>
+                <div class="mb-3">
+                    <strong>Cuerpo:</strong><br>
+                    <pre id="verCuerpo" style="background: #f5f5f5; padding: 15px; border-radius: 5px;"></pre>
+                </div>
+                <div class="mb-3">
+                    <strong>Estado:</strong> <span id="verEstado"></span>
+                </div>
+                <div class="mb-3" id="seccionRespuesta" style="display: none;">
+                    <strong>Respuesta del Proveedor:</strong><br>
+                    <textarea class="form-control" id="verRespuesta" rows="4"></textarea>
+                    <button class="btn btn-sm btn-primary mt-2" onclick="actualizarRespuesta()">Guardar Respuesta</button>
+                </div>
+            </div>
+                        <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-primary" id="btnEnviarEmail" onclick="enviarEmailTakedown()">
+                    📧 Enviar Email Automático
+                </button>
+                <button type="button" class="btn btn-success" id="btnMarcarEnviado" onclick="marcarComoEnviado()">
+                    ✅ Marcar como Enviado (Manual)
+                </button>
+                <button type="button" class="btn btn-info" id="btnMarcarConfirmado" onclick="marcarComoConfirmado()">
+                    ✔️ Marcar como Confirmado
+                </button>
+            </div>
+
         </div>
     </div>
 </div>

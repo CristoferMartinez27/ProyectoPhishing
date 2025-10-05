@@ -120,7 +120,8 @@ class Takedown(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     sitio_id = Column(Integer, ForeignKey("sitio.id"), nullable=False)
-    destinatario = Column(String(255), nullable=False)
+    destinatario = Column(String(255), nullable=False)  # Destinatario principal
+    destinatarios_adicionales = Column(Text)  # Lista de emails separados por comas
     asunto = Column(String(500))
     cuerpo = Column(Text)
     estado = Column(Enum(EstadoTakedown), default=EstadoTakedown.PENDIENTE)

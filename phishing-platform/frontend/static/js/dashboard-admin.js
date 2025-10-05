@@ -41,7 +41,13 @@ function showSection(section) {
     } else if (section === 'sitios') {
         document.getElementById('sitiosSection').style.display = 'block';
         cargarSitios();  // ← VERIFICA QUE ESTA LÍNEA EXISTA
-    }
+    }else if (section === 'whitelist') {
+    document.getElementById('whitelistSection').style.display = 'block';
+    cargarWhitelist();
+}else if (section === 'takedown') {
+    document.getElementById('takedownSection').style.display = 'block';
+    cargarTakedowns();
+}
 }
 
 // Cargar estadísticas
@@ -388,6 +394,7 @@ async function cargarSitios() {
                     <td>
                         <button class="btn btn-sm btn-primary me-1" onclick="validarSitio(${s.id})">Validar</button>
                         <button class="btn btn-sm btn-danger" onclick="eliminarSitio(${s.id})">Eliminar</button>
+                        ${s.es_malicioso ? `<button class="btn btn-sm btn-warning me-1" onclick="generarTakedown(${s.id})">Takedown</button>` : ''}
                     </td>
                 </tr>
             `;
@@ -513,6 +520,541 @@ async function validarSitio(id) {
         }
     } catch (error) {
         alert('Error al validar sitio');
+        console.error(error);
+    }
+}
+
+// ========== GESTIÓN DE WHITELIST ==========
+
+// Cargar whitelist
+async function cargarWhitelist() {
+    try {
+        const response = await fetch(`${API_URL}/api/whitelist/`, { headers });
+        const whitelist = await response.json();
+        
+        const tbody = document.getElementById('tablaWhitelist');
+        if (whitelist.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No hay URLs en la whitelist</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = whitelist.map(w => `
+            <tr>
+                <td>${w.id}</td>
+                <td><span class="badge bg-info">${w.cliente_nombre}</span></td>
+                <td><code>${w.url}</code></td>
+                <td>${w.descripcion || '<em class="text-muted">Sin descripción</em>'}</td>
+                <td>${new Date(w.fecha_agregado).toLocaleDateString()}</td>
+                <td>
+                    <button class="btn btn-sm btn-warning me-1" onclick="editarWhitelist(${w.id})">Editar</button>
+                    <button class="btn btn-sm btn-danger" onclick="eliminarWhitelist(${w.id})">Eliminar</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        console.error('Error cargando whitelist:', error);
+    }
+}
+
+// Modal agregar whitelist
+async function showModalWhitelist() {
+    document.getElementById('tituloModalWhitelist').textContent = 'Agregar URL a Whitelist';
+    document.getElementById('formWhitelist').reset();
+    document.getElementById('whitelistId').value = '';
+    
+    // Cargar clientes activos
+    const response = await fetch(`${API_URL}/api/clientes/`, { headers });
+    const clientes = await response.json();
+    
+    const select = document.getElementById('whitelistCliente');
+    select.innerHTML = '<option value="">Seleccione el cliente...</option>' +
+        clientes.filter(c => c.activo).map(c => 
+            `<option value="${c.id}">${c.nombre} (${c.dominio_legitimo})</option>`
+        ).join('');
+    
+    new bootstrap.Modal(document.getElementById('modalWhitelist')).show();
+}
+
+// Editar whitelist
+async function editarWhitelist(id) {
+    try {
+        const response = await fetch(`${API_URL}/api/whitelist/`, { headers });
+        const whitelist = await response.json();
+        const item = whitelist.find(w => w.id === id);
+        
+        if (!item) {
+            alert('Entrada no encontrada');
+            return;
+        }
+        
+        document.getElementById('tituloModalWhitelist').textContent = 'Editar Whitelist';
+        document.getElementById('whitelistId').value = item.id;
+        document.getElementById('whitelistUrl').value = item.url;
+        document.getElementById('whitelistDescripcion').value = item.descripcion || '';
+        
+        // Cargar clientes y seleccionar el actual
+        const clientesResponse = await fetch(`${API_URL}/api/clientes/`, { headers });
+        const clientes = await clientesResponse.json();
+        const select = document.getElementById('whitelistCliente');
+        select.innerHTML = clientes.filter(c => c.activo).map(c => 
+            `<option value="${c.id}" ${c.id === item.cliente_id ? 'selected' : ''}>${c.nombre}</option>`
+        ).join('');
+        select.disabled = true; // No permitir cambiar el cliente al editar
+        
+        new bootstrap.Modal(document.getElementById('modalWhitelist')).show();
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al cargar datos');
+    }
+}
+
+// Guardar whitelist
+async function guardarWhitelist() {
+    const whitelistId = document.getElementById('whitelistId').value;
+    const esEdicion = whitelistId !== '';
+    
+    const data = {
+        url: document.getElementById('whitelistUrl').value,
+        descripcion: document.getElementById('whitelistDescripcion').value || null
+    };
+    
+    if (!esEdicion) {
+        data.cliente_id = parseInt(document.getElementById('whitelistCliente').value);
+        if (!data.cliente_id) {
+            alert('Debe seleccionar un cliente');
+            return;
+        }
+    }
+    
+    try {
+        const url = esEdicion ? `${API_URL}/api/whitelist/${whitelistId}` : `${API_URL}/api/whitelist/`;
+        const method = esEdicion ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method,
+            headers,
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            alert(esEdicion ? 'Whitelist actualizada correctamente' : 'URL agregada a whitelist correctamente');
+            document.getElementById('formWhitelist').reset();
+            document.getElementById('whitelistCliente').disabled = false;
+            bootstrap.Modal.getInstance(document.getElementById('modalWhitelist')).hide();
+            cargarWhitelist();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch (error) {
+        alert('Error guardando en whitelist');
+        console.error(error);
+    }
+}
+
+// Eliminar de whitelist
+async function eliminarWhitelist(id) {
+    if (!confirm('¿Está seguro de eliminar esta URL de la whitelist?')) return;
+    
+    try {
+        const response = await fetch(`${API_URL}/api/whitelist/${id}`, {
+            method: 'DELETE',
+            headers
+        });
+        
+        if (response.ok) {
+            alert('URL eliminada de la whitelist correctamente');
+            cargarWhitelist();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch (error) {
+        alert('Error eliminando de whitelist');
+        console.error(error);
+    }
+}
+
+let takedownActualId = null;
+// Cargar takedowns
+async function cargarTakedowns() {
+    try {
+        const response = await fetch(`${API_URL}/api/takedown/`, { headers });
+        const takedowns = await response.json();
+        
+        const tbody = document.getElementById('tablaTakedown');
+        if (takedowns.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No hay solicitudes de takedown</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = takedowns.map(t => {
+            const estadoBadge = {
+                'pendiente': 'bg-secondary',
+                'enviado': 'bg-info',
+                'confirmado': 'bg-success',
+                'rechazado': 'bg-danger'
+            }[t.estado] || 'bg-secondary';
+            
+            return `
+                <tr>
+                    <td>${t.id}</td>
+                    <td><code>${t.sitio_url}</code></td>
+                    <td>${t.cliente_nombre}</td>
+                    <td>${t.destinatario}</td>
+                    <td><span class="badge ${estadoBadge}">${t.estado.toUpperCase()}</span></td>
+                    <td>${t.fecha_envio ? new Date(t.fecha_envio).toLocaleDateString() : '-'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-info me-1" onclick="verTakedown(${t.id})">Ver</button>
+                        <button class="btn btn-sm btn-danger" onclick="eliminarTakedown(${t.id})">Eliminar</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error cargando takedowns:', error);
+    }
+}
+
+// Generar takedown
+// Generar takedown
+async function generarTakedown(sitioId) {
+    try {
+        const response = await fetch(`${API_URL}/api/takedown/generar/${sitioId}`, {
+            method: 'POST',
+            headers
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+            return;
+        }
+
+        const data = await response.json();
+
+        // Llenar el formulario
+        document.getElementById('takedownSitioId').value = sitioId;
+        document.getElementById('takedownDestinatario').value = '';
+        document.getElementById('takedownSugerencia').textContent = data.destinatario_sugerido;
+        document.getElementById('takedownAsunto').value = data.asunto;
+        document.getElementById('takedownCuerpo').value = data.cuerpo;
+        
+        // Mostrar lista de proveedores comunes
+        const listaEmails = document.getElementById('listaEmails');
+        listaEmails.innerHTML = data.emails_abuse_comunes.map(email => 
+            `<li>${email}</li>`
+        ).join('');
+        
+        // Guardar los emails comunes en un atributo data
+        document.getElementById('enviarATodos').setAttribute('data-emails', JSON.stringify(data.emails_abuse_comunes));
+        
+        // Marcar checkbox por defecto
+        document.getElementById('enviarATodos').checked = true;
+        document.getElementById('listaProveedoresComunes').style.display = 'block';
+        
+        // Deshabilitar edición por defecto
+        document.getElementById('takedownAsunto').readOnly = true;
+        document.getElementById('takedownCuerpo').readOnly = true;
+        
+        // Mostrar modal
+        new bootstrap.Modal(document.getElementById('modalGenerarTakedown')).show();
+        
+    } catch (error) {
+        console.error('Error generando el takedown:', error);
+        alert('Hubo un error al generar el takedown.');
+    }
+}
+
+// Toggle envío masivo
+function toggleEnvioMasivo() {
+    const checkbox = document.getElementById('enviarATodos');
+    const lista = document.getElementById('listaProveedoresComunes');
+    
+    if (checkbox.checked) {
+        lista.style.display = 'block';
+    } else {
+        lista.style.display = 'none';
+    }
+}
+
+// Habilitar edición del template
+function habilitarEdicion() {
+    document.getElementById('takedownAsunto').readOnly = false;
+    document.getElementById('takedownCuerpo').readOnly = false;
+    alert('Ahora puedes editar el asunto y el cuerpo del email');
+}
+
+// Copiar al portapapeles
+function copiarAlPortapapeles() {
+    const cuerpo = document.getElementById('takedownCuerpo').value;
+    navigator.clipboard.writeText(cuerpo).then(() => {
+        alert('✅ Email copiado al portapapeles');
+    }).catch(err => {
+        console.error('Error al copiar:', err);
+        alert('No se pudo copiar al portapapeles');
+    });
+}
+
+// Guardar takedown
+async function guardarTakedown() {
+    const sitioId = document.getElementById('takedownSitioId').value;
+    const destinatario = document.getElementById('takedownDestinatario').value;
+    const asunto = document.getElementById('takedownAsunto').value;
+    const cuerpo = document.getElementById('takedownCuerpo').value;
+    const enviarATodos = document.getElementById('enviarATodos').checked;
+    
+    if (!destinatario) {
+        alert('Debe ingresar un email destinatario principal (del hosting específico)');
+        return;
+    }
+    
+    // Preparar lista de destinatarios
+    let destinatarios_secundarios = [];
+    
+    if (enviarATodos) {
+        const emailsComunes = JSON.parse(document.getElementById('enviarATodos').getAttribute('data-emails'));
+        destinatarios_secundarios = emailsComunes;
+    }
+    
+    const data = {
+        sitio_id: parseInt(sitioId),
+        destinatario_principal: destinatario,
+        destinatarios_secundarios: destinatarios_secundarios.length > 0 ? destinatarios_secundarios : null,
+        asunto: asunto,
+        cuerpo: cuerpo
+    };
+    
+    const totalDestinatarios = 1 + (destinatarios_secundarios.length || 0);
+    
+    try {
+        const response = await fetch(`${API_URL}/api/takedown/`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            alert(`✅ Solicitud de takedown guardada correctamente.\n\nSe generó para ${totalDestinatarios} destinatario(s):\n- Principal: ${destinatario}\n${destinatarios_secundarios.length > 0 ? '- Adicionales: ' + destinatarios_secundarios.length : ''}\n\nAhora puedes copiar el email y enviarlo.`);
+            document.getElementById('formGenerarTakedown').reset();
+            bootstrap.Modal.getInstance(document.getElementById('modalGenerarTakedown')).hide();
+            cargarTakedowns();
+            cargarSitios();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch (error) {
+        alert('Error guardando takedown');
+        console.error(error);
+    }
+}
+
+// Ver detalles de takedown
+// Ver detalles de takedown
+async function verTakedown(id) {
+    try {
+        const response = await fetch(`${API_URL}/api/takedown/`, { headers });
+        const takedowns = await response.json();
+        const takedown = takedowns.find(t => t.id === id);
+        
+        if (!takedown) {
+            alert('Takedown no encontrado');
+            return;
+        }
+        
+        takedownActualId = id;
+        
+        // Mostrar destinatarios
+        let destinatariosHTML = `<strong>Principal:</strong> ${takedown.destinatario}`;
+        if (takedown.destinatarios_adicionales) {
+            const cantidad = takedown.destinatarios_adicionales.split(',').length;
+            destinatariosHTML += `<br><strong>CC (${cantidad} adicionales):</strong> ${takedown.destinatarios_adicionales}`;
+        }
+        document.getElementById('verDestinatario').innerHTML = destinatariosHTML;
+        
+        document.getElementById('verAsunto').textContent = takedown.asunto;
+        document.getElementById('verCuerpo').textContent = takedown.cuerpo;
+        
+        const estadoBadge = {
+            'pendiente': '<span class="badge bg-secondary">PENDIENTE</span>',
+            'enviado': '<span class="badge bg-info">ENVIADO</span>',
+            'confirmado': '<span class="badge bg-success">CONFIRMADO</span>',
+            'rechazado': '<span class="badge bg-danger">RECHAZADO</span>'
+        }[takedown.estado] || '<span class="badge bg-secondary">DESCONOCIDO</span>';
+        
+        document.getElementById('verEstado').innerHTML = estadoBadge;
+        
+        // Mostrar/ocultar botones según estado
+        const btnEnviarEmail = document.getElementById('btnEnviarEmail');
+        const btnEnviado = document.getElementById('btnMarcarEnviado');
+        const btnConfirmado = document.getElementById('btnMarcarConfirmado');
+        
+        if (takedown.estado === 'pendiente') {
+            btnEnviarEmail.style.display = 'inline-block';
+            btnEnviado.style.display = 'inline-block';
+            btnConfirmado.style.display = 'none';
+        } else if (takedown.estado === 'enviado') {
+            btnEnviarEmail.style.display = 'none';
+            btnEnviado.style.display = 'none';
+            btnConfirmado.style.display = 'inline-block';
+        } else {
+            btnEnviarEmail.style.display = 'none';
+            btnEnviado.style.display = 'none';
+            btnConfirmado.style.display = 'none';
+        }
+        
+        if (takedown.respuesta_proveedor) {
+            document.getElementById('seccionRespuesta').style.display = 'block';
+            document.getElementById('verRespuesta').value = takedown.respuesta_proveedor;
+        } else {
+            document.getElementById('seccionRespuesta').style.display = 'none';
+        }
+        
+        new bootstrap.Modal(document.getElementById('modalVerTakedown')).show();
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al cargar detalles del takedown');
+    }
+}
+
+// Marcar como enviado
+async function marcarComoEnviado() {
+    if (!takedownActualId) return;
+    
+    if (!confirm('¿Confirma que envió el email al proveedor?')) return;
+    
+    try {
+        const response = await fetch(`${API_URL}/api/takedown/${takedownActualId}/marcar-enviado`, {
+            method: 'POST',
+            headers
+        });
+        
+        if (response.ok) {
+            alert('✅ Takedown marcado como ENVIADO');
+            bootstrap.Modal.getInstance(document.getElementById('modalVerTakedown')).hide();
+            cargarTakedowns();
+            cargarSitios();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch (error) {
+        alert('Error al actualizar takedown');
+        console.error(error);
+    }
+}
+
+// Marcar como confirmado
+async function marcarComoConfirmado() {
+    if (!takedownActualId) return;
+    
+    if (!confirm('¿Confirma que el proveedor eliminó el sitio fraudulento?')) return;
+    
+    try {
+        const response = await fetch(`${API_URL}/api/takedown/${takedownActualId}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({
+                estado: 'confirmado',
+                respuesta_proveedor: document.getElementById('verRespuesta').value || null
+            })
+        });
+        
+        if (response.ok) {
+            alert('✅ Takedown CONFIRMADO. El sitio ha sido marcado como caído.');
+            bootstrap.Modal.getInstance(document.getElementById('modalVerTakedown')).hide();
+            cargarTakedowns();
+            cargarSitios();
+            cargarEstadisticas(); // Actualizar dashboard
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch (error) {
+        alert('Error al actualizar takedown');
+        console.error(error);
+    }
+}
+
+// Actualizar respuesta del proveedor
+async function actualizarRespuesta() {
+    if (!takedownActualId) return;
+    
+    const respuesta = document.getElementById('verRespuesta').value;
+    
+    try {
+        const response = await fetch(`${API_URL}/api/takedown/${takedownActualId}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({
+                estado: 'enviado', // Mantener el estado actual
+                respuesta_proveedor: respuesta
+            })
+        });
+        
+        if (response.ok) {
+            alert('✅ Respuesta guardada correctamente');
+            cargarTakedowns();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch (error) {
+        alert('Error al guardar respuesta');
+        console.error(error);
+    }
+}
+
+// Eliminar takedown
+async function eliminarTakedown(id) {
+    if (!confirm('¿Está seguro de eliminar esta solicitud de takedown?')) return;
+    
+    try {
+        const response = await fetch(`${API_URL}/api/takedown/${id}`, {
+            method: 'DELETE',
+            headers
+        });
+        
+        if (response.ok) {
+            alert('Takedown eliminado correctamente');
+            cargarTakedowns();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch (error) {
+        alert('Error eliminando takedown');
+        console.error(error);
+    }
+}
+
+// Enviar email automático
+async function enviarEmailTakedown() {
+    if (!takedownActualId) return;
+    
+    if (!confirm('¿Desea enviar el email de takedown AHORA vía SMTP?\n\nSe enviará automáticamente a todos los destinatarios configurados.')) return;
+    
+    try {
+        const response = await fetch(`${API_URL}/api/takedown/${takedownActualId}/enviar-email`, {
+            method: 'POST',
+            headers
+        });
+        
+        if (response.ok) {
+            const resultado = await response.json();
+            const destinatarios = resultado.destinatarios_enviados.join('\n- ');
+            alert(`✅ ${resultado.mensaje}\n\nDestinatarios:\n- ${destinatarios}`);
+            bootstrap.Modal.getInstance(document.getElementById('modalVerTakedown')).hide();
+            cargarTakedowns();
+            cargarSitios();
+        } else {
+            const error = await response.json();
+            alert('❌ Error al enviar email:\n\n' + error.detail);
+        }
+    } catch (error) {
+        alert('❌ Error al enviar email');
         console.error(error);
     }
 }
