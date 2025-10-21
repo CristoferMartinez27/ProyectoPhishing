@@ -4,7 +4,7 @@ from typing import List
 from models.database import get_db
 from models.models import Cliente, Bitacora, Usuario
 from schemas.clientes import ClienteCreate, ClienteUpdate, ClienteResponse
-from utils.auth import require_admin
+from utils.auth import require_admin, get_current_user
 from datetime import datetime
 
 router = APIRouter(prefix="/api/clientes", tags=["Clientes"])
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/clientes", tags=["Clientes"])
 @router.get("/", response_model=List[ClienteResponse])
 def listar_clientes(
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin)
+    current_user: Usuario = Depends(get_current_user)
 ):
     """Lista todos los clientes"""
     clientes = db.query(Cliente).all()

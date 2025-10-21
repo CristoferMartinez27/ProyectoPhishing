@@ -16,6 +16,34 @@ const headers = {
     'Content-Type': 'application/json'
 };
 
+// Mostrar info del usuario y configurar permisos
+document.getElementById('userInfo').textContent = `👤 ${usuario.nombre_completo}`;
+document.getElementById('rolUsuario').textContent = usuario.rol === 'administrador' ? 'Administrador' : 'Analista';
+
+// Configurar interfaz según rol
+function configurarPermisosPorRol() {
+    const esAdmin = usuario.rol === 'administrador';
+    
+    // Mostrar/ocultar menús según rol
+    if (esAdmin) {
+    document.getElementById('menu-usuarios').style.display = 'block';
+    document.getElementById('menu-clientes').style.display = 'block';
+    document.getElementById('menu-bitacora').style.display = 'block';  // ← AGREGAR
+    document.getElementById('card-usuarios').style.display = 'block';
+} else {
+    document.getElementById('menu-usuarios').style.display = 'none';
+    document.getElementById('menu-clientes').style.display = 'none';
+    document.getElementById('menu-bitacora').style.display = 'none';  // ← AGREGAR
+    document.getElementById('card-usuarios').style.display = 'none';
+}
+    
+    return esAdmin;
+}
+
+// Ejecutar al cargar
+const esAdmin = configurarPermisosPorRol();
+
+
 // Cerrar sesión
 function logout() {
     localStorage.removeItem('access_token');
@@ -24,12 +52,18 @@ function logout() {
 }
 
 // Cambiar sección
+// Cambiar sección
 function showSection(section) {
+    // Validar permisos
+    if (!esAdmin && (section === 'usuarios' || section === 'clientes')) {
+        alert('⛔ No tienes permisos para acceder a esta sección');
+        return;
+    }
+    
     document.querySelectorAll('.content-section').forEach(s => s.style.display = 'none');
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     
     if (section === 'dashboard') {
-        cargarEstadisticas()
         document.getElementById('dashboardSection').style.display = 'block';
         cargarEstadisticas();
     } else if (section === 'usuarios') {
@@ -40,25 +74,33 @@ function showSection(section) {
         cargarClientes();
     } else if (section === 'sitios') {
         document.getElementById('sitiosSection').style.display = 'block';
-        cargarSitios();  // ← VERIFICA QUE ESTA LÍNEA EXISTA
-    }else if (section === 'whitelist') {
-    document.getElementById('whitelistSection').style.display = 'block';
-    cargarWhitelist();
-}else if (section === 'takedown') {
-    document.getElementById('takedownSection').style.display = 'block';
-    cargarTakedowns();
+        cargarSitios();
+    } else if (section === 'whitelist') {
+        document.getElementById('whitelistSection').style.display = 'block';
+        cargarWhitelist();
+    } else if (section === 'takedown') {
+        document.getElementById('takedownSection').style.display = 'block';
+        cargarTakedowns();
+    }else if (section === 'bitacora') {
+        document.getElementById('bitacoraSection').style.display = 'block';
+        cargarBitacora();
+        cargarFiltrosBitacora();
+    }if (esAdmin || !esAdmin) {  // Mostrar gráficos para todos
+    cargarGraficos();
 }
 }
 
 // Cargar estadísticas
 async function cargarEstadisticas() {
     try {
-        // Contar usuarios
-        const usuariosResponse = await fetch(`${API_URL}/api/usuarios/`, { headers });
-        const usuarios = await usuariosResponse.json();
-        document.getElementById('totalUsuarios').textContent = usuarios.length;
+        // Solo cargar usuarios si es admin
+        if (esAdmin) {
+            const usuariosResponse = await fetch(`${API_URL}/api/usuarios/`, { headers });
+            const usuarios = await usuariosResponse.json();
+            document.getElementById('totalUsuarios').textContent = usuarios.length;
+        }
         
-        // Contar clientes activos
+        // Cargar clientes para todos (fuera del if)
         const clientesResponse = await fetch(`${API_URL}/api/clientes/`, { headers });
         const clientes = await clientesResponse.json();
         document.getElementById('totalClientes').textContent = clientes.filter(c => c.activo).length;
@@ -85,19 +127,21 @@ async function cargarUsuarios() {
         
         const tbody = document.getElementById('tablaUsuarios');
         tbody.innerHTML = usuarios.map(u => `
-            <tr>
-                <td>${u.id}</td>
-                <td>${u.nombre_completo}</td>
-                <td>${u.nombre_usuario}</td>
-                <td>${u.correo}</td>
-                <td><span class="badge bg-primary">${u.rol_nombre}</span></td>
-                <td>${u.activo ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-danger">Inactivo</span>'}</td>
-                <td>
-                    <button class="btn btn-sm btn-warning me-1" onclick="editarUsuario(${u.id})">Editar</button>
-                    <button class="btn btn-sm btn-danger" onclick="eliminarUsuario(${u.id})">Eliminar</button>
-                </td>
-            </tr>
-        `).join('');
+    <tr>
+        <td>${u.id}</td>
+        <td>${u.nombre_completo}</td>
+        <td>${u.nombre_usuario}</td>
+        <td>${u.correo}</td>
+        <td><span class="badge bg-primary">${u.rol_nombre}</span></td>
+        <td>${u.activo ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-danger">Inactivo</span>'}</td>
+        <td>
+            ${esAdmin ? `
+                <button class="btn btn-sm btn-warning me-1" onclick="editarUsuario(${u.id})">Editar</button>
+                <button class="btn btn-sm btn-danger" onclick="eliminarUsuario(${u.id})">Eliminar</button>
+            ` : '<em class="text-muted">Sin permisos</em>'}
+        </td>
+    </tr>
+`).join('');
     } catch (error) {
         console.error('Error cargando usuarios:', error);
     }
@@ -105,6 +149,10 @@ async function cargarUsuarios() {
 
 // Modal crear usuario (nuevo)
 async function showModalUsuario() {
+    if (!esAdmin) {
+        alert('⛔ No tienes permisos para esta acción');
+        return;
+    }
     document.getElementById('tituloModalUsuario').textContent = 'Crear Nuevo Usuario';
     document.getElementById('formUsuario').reset();
     document.getElementById('usuarioId').value = '';
@@ -125,6 +173,10 @@ async function showModalUsuario() {
 
 // Editar usuario
 async function editarUsuario(id) {
+    if (!esAdmin) {
+        alert('⛔ No tienes permisos para esta acción');
+        return;
+    }
     try {
         const response = await fetch(`${API_URL}/api/usuarios/`, { headers });
         const usuarios = await response.json();
@@ -166,6 +218,10 @@ async function editarUsuario(id) {
 
 // Guardar usuario (crear o actualizar)
 async function guardarUsuario() {
+    if (!esAdmin) {
+        alert('⛔ No tienes permisos para esta acción');
+        return;
+    }
     const usuarioId = document.getElementById('usuarioId').value;
     const esEdicion = usuarioId !== '';
     
@@ -208,6 +264,11 @@ async function guardarUsuario() {
 
 // Eliminar usuario (sin cambios)
 async function eliminarUsuario(id) {
+    if (!esAdmin) {
+        alert('⛔ No tienes permisos para esta acción');
+        return;
+    }
+    
     if (!confirm('¿Está seguro de eliminar este usuario?')) return;
     
     try {
@@ -240,20 +301,22 @@ async function cargarClientes() {
         }
         
         tbody.innerHTML = clientes.map(c => `
-            <tr>
-                <td>${c.id}</td>
-                <td>${c.nombre}</td>
-                <td><code>${c.dominio_legitimo}</code></td>
-                <td>${c.contacto_nombre || '-'}</td>
-                <td>${c.contacto_correo || '-'}</td>
-                <td>${c.contacto_telefono || '-'}</td>
-                <td>${c.activo ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-danger">Inactivo</span>'}</td>
-                <td>
-                    <button class="btn btn-sm btn-warning me-1" onclick="editarCliente(${c.id})">Editar</button>
-                    <button class="btn btn-sm btn-danger" onclick="eliminarCliente(${c.id})">Eliminar</button>
-                </td>
-            </tr>
-        `).join('');
+    <tr>
+        <td>${c.id}</td>
+        <td>${c.nombre}</td>
+        <td><code>${c.dominio_legitimo}</code></td>
+        <td>${c.contacto_nombre || '-'}</td>
+        <td>${c.contacto_correo || '-'}</td>
+        <td>${c.contacto_telefono || '-'}</td>
+        <td>${c.activo ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-danger">Inactivo</span>'}</td>
+        <td>
+            ${esAdmin ? `
+                <button class="btn btn-sm btn-warning me-1" onclick="editarCliente(${c.id})">Editar</button>
+                <button class="btn btn-sm btn-danger" onclick="eliminarCliente(${c.id})">Eliminar</button>
+            ` : '<em class="text-muted">Solo lectura</em>'}
+        </td>
+    </tr>
+`).join('');
         
         document.getElementById('totalClientes').textContent = clientes.filter(c => c.activo).length;
     } catch (error) {
@@ -263,6 +326,10 @@ async function cargarClientes() {
 
 // Modal crear cliente
 function showModalCliente() {
+    if (!esAdmin) {
+        alert('⛔ No tienes permisos para esta acción');
+        return;
+    }
     document.getElementById('tituloModalCliente').textContent = 'Crear Nuevo Cliente';
     document.getElementById('formCliente').reset();
     document.getElementById('clienteId').value = '';
@@ -271,6 +338,10 @@ function showModalCliente() {
 
 // Editar cliente
 async function editarCliente(id) {
+    if (!esAdmin) {
+        alert('⛔ No tienes permisos para esta acción');
+        return;
+    }
     try {
         const response = await fetch(`${API_URL}/api/clientes/`, { headers });
         const clientes = await response.json();
@@ -299,6 +370,10 @@ async function editarCliente(id) {
 
 // Guardar cliente (crear o actualizar)
 async function guardarCliente() {
+    if (!esAdmin) {
+        alert('⛔ No tienes permisos para esta acción');
+        return;
+    }
     const clienteId = document.getElementById('clienteId').value;
     const esEdicion = clienteId !== '';
     
@@ -338,6 +413,11 @@ async function guardarCliente() {
 
 // Eliminar cliente (sin cambios)
 async function eliminarCliente(id) {
+    if (!esAdmin) {
+        alert('⛔ No tienes permisos para esta acción');
+        return;
+    }
+    
     if (!confirm('¿Está seguro de eliminar este cliente? Se eliminarán también todos sus sitios asociados.')) return;
     
     try {
@@ -451,7 +531,7 @@ async function reportarSitio() {
             document.getElementById('formReportarSitio').reset();
             bootstrap.Modal.getInstance(document.getElementById('modalReportarSitio')).hide();
             cargarSitios();
-            cargarEstadisticas(); // Actualizar dashboard
+            cargarEstadisticas();
         } else {
             const error = await response.json();
             alert('Error: ' + error.detail);
@@ -482,9 +562,13 @@ async function eliminarSitio(id) {
         console.error(error);
     }
 }
+
 // Validar sitio con APIs
 async function validarSitio(id) {
-    if (!confirm('¿Desea validar este sitio con las APIs externas?\n\nNota: Se requieren API Keys configuradas.')) return;
+    if (!confirm('¿Desea validar este sitio con las APIs externas?\n\nNota: El proceso puede tardar hasta 20 segundos.')) return;
+    
+    // Mostrar mensaje de carga
+    alert('⏳ Validando sitio...\n\nEsto puede tardar hasta 20 segundos.\nPor favor espere.');
     
     try {
         const response = await fetch(`${API_URL}/api/sitios/${id}/validar`, {
@@ -495,20 +579,36 @@ async function validarSitio(id) {
         if (response.ok) {
             const result = await response.json();
             
-            let mensaje = `Validación completada:\n\n`;
+            let mensaje = `✅ Validación completada\n\n`;
             mensaje += `URL: ${result.url}\n`;
+            if (result.ip) mensaje += `IP: ${result.ip}\n`;
             mensaje += `Estado: ${result.estado.toUpperCase()}\n`;
-            mensaje += `¿Es malicioso?: ${result.es_malicioso ? 'SÍ' : 'NO'}\n\n`;
-            mensaje += `Resultados por servicio:\n`;
+            mensaje += `¿Es malicioso?: ${result.es_malicioso ? 'SÍ' : 'NO'}\n`;
+            mensaje += `Detecciones: ${result.detecciones}\n\n`;
+            mensaje += `Resultados detallados:\n`;
+            mensaje += `${'='.repeat(50)}\n`;
             
             result.validaciones.forEach(v => {
                 mensaje += `\n${v.servicio}:\n`;
                 if (v.error) {
-                    mensaje += `  - Error: ${v.error}\n`;
+                    mensaje += `  ❌ Error: ${v.error}\n`;
                 } else {
-                    mensaje += `  - Malicioso: ${v.malicioso ? 'SÍ' : 'NO'}\n`;
-                    if (v.detecciones) mensaje += `  - Detecciones: ${v.detecciones}/${v.total_escaneos}\n`;
-                    if (v.score) mensaje += `  - Score: ${v.score}%\n`;
+                    mensaje += `  • Malicioso: ${v.malicioso ? 'SÍ ⚠️' : 'NO ✅'}\n`;
+                    if (v.detecciones !== undefined) {
+                        mensaje += `  • Detecciones: ${v.detecciones}/${v.total_escaneos}\n`;
+                    }
+                    if (v.score !== undefined) {
+                        mensaje += `  • Score de abuso: ${v.score}%\n`;
+                    }
+                    if (v.reportes !== undefined) {
+                        mensaje += `  • Reportes: ${v.reportes}\n`;
+                    }
+                    if (v.amenazas_detectadas !== undefined) {
+                        mensaje += `  • Amenazas: ${v.amenazas_detectadas}\n`;
+                    }
+                    if (v.tipos_amenaza && v.tipos_amenaza.length > 0) {
+                        mensaje += `  • Tipos: ${v.tipos_amenaza.join(', ')}\n`;
+                    }
                 }
             });
             
@@ -516,10 +616,10 @@ async function validarSitio(id) {
             cargarSitios();
         } else {
             const error = await response.json();
-            alert('Error: ' + error.detail);
+            alert('❌ Error: ' + error.detail);
         }
     } catch (error) {
-        alert('Error al validar sitio');
+        alert('❌ Error al validar sitio');
         console.error(error);
     }
 }
@@ -599,7 +699,7 @@ async function editarWhitelist(id) {
         select.innerHTML = clientes.filter(c => c.activo).map(c => 
             `<option value="${c.id}" ${c.id === item.cliente_id ? 'selected' : ''}>${c.nombre}</option>`
         ).join('');
-        select.disabled = true; // No permitir cambiar el cliente al editar
+        select.disabled = true;
         
         new bootstrap.Modal(document.getElementById('modalWhitelist')).show();
     } catch (error) {
@@ -1056,5 +1156,445 @@ async function enviarEmailTakedown() {
     } catch (error) {
         alert('❌ Error al enviar email');
         console.error(error);
+    }
+}
+
+
+// ========== GESTIÓN DE BITÁCORA ==========
+
+// Cargar bitácora
+async function cargarBitacora() {
+    try {
+        const limite = document.getElementById('limiteBitacora').value;
+        const accion = document.getElementById('filtroBitacoraAccion').value;
+        const usuario_id = document.getElementById('filtroBitacoraUsuario').value;
+        
+        let url = `${API_URL}/api/bitacora/?limite=${limite}`;
+        if (accion) url += `&accion=${accion}`;
+        if (usuario_id) url += `&usuario_id=${usuario_id}`;
+        
+        const response = await fetch(url, { headers });
+        const bitacoras = await response.json();
+        
+        const tbody = document.getElementById('tablaBitacora');
+        if (bitacoras.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No hay registros de bitácora</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = bitacoras.map(b => {
+            const fecha = new Date(b.fecha);
+            const fechaFormateada = fecha.toLocaleDateString() + ' ' + fecha.toLocaleTimeString();
+            
+            const accionBadge = {
+                'LOGIN': 'bg-success',
+                'CREAR': 'bg-primary',
+                'ACTUALIZAR': 'bg-warning',
+                'ELIMINAR': 'bg-danger',
+                'VALIDAR': 'bg-info',
+                'ENVIAR': 'bg-secondary'
+            };
+            
+            let badgeClass = 'bg-secondary';
+            for (let key in accionBadge) {
+                if (b.accion.includes(key)) {
+                    badgeClass = accionBadge[key];
+                    break;
+                }
+            }
+            
+            return `
+                <tr>
+                    <td>${b.id}</td>
+                    <td><small>${fechaFormateada}</small></td>
+                    <td><small>${b.usuario_nombre}</small></td>
+                    <td><span class="badge ${badgeClass}">${b.accion}</span></td>
+                    <td><small>${b.detalle || '-'}</small></td>
+                    <td><small>${b.ip_origen || '-'}</small></td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error cargando bitácora:', error);
+    }
+}
+
+// Cargar filtros de bitácora
+async function cargarFiltrosBitacora() {
+    try {
+        // Cargar acciones
+        const accionesResponse = await fetch(`${API_URL}/api/bitacora/acciones`, { headers });
+        const acciones = await accionesResponse.json();
+        
+        const selectAccion = document.getElementById('filtroBitacoraAccion');
+        selectAccion.innerHTML = '<option value="">Todas</option>' +
+            acciones.map(a => `<option value="${a}">${a}</option>`).join('');
+        
+        // Cargar usuarios
+        const usuariosResponse = await fetch(`${API_URL}/api/usuarios/`, { headers });
+        const usuarios = await usuariosResponse.json();
+        
+        const selectUsuario = document.getElementById('filtroBitacoraUsuario');
+        selectUsuario.innerHTML = '<option value="">Todos</option>' +
+            usuarios.map(u => `<option value="${u.id}">${u.nombre_completo}</option>`).join('');
+    } catch (error) {
+        console.error('Error cargando filtros:', error);
+    }
+}
+
+// Limpiar filtros
+function limpiarFiltrosBitacora() {
+    document.getElementById('filtroBitacoraAccion').value = '';
+    document.getElementById('filtroBitacoraUsuario').value = '';
+    document.getElementById('limiteBitacora').value = '100';
+    cargarBitacora();
+}
+
+// Ver estadísticas de bitácora
+async function cargarEstadisticasBitacora() {
+    try {
+        const response = await fetch(`${API_URL}/api/bitacora/estadisticas`, { headers });
+        const stats = await response.json();
+        
+        let mensaje = `📊 ESTADÍSTICAS DE BITÁCORA\n\n`;
+        mensaje += `Total de registros: ${stats.total_registros}\n`;
+        mensaje += `Últimas 24h: ${stats.registros_24h}\n\n`;
+        
+        mensaje += `Acciones más frecuentes:\n`;
+        mensaje += `${'-'.repeat(40)}\n`;
+        stats.acciones_frecuentes.forEach(a => {
+            mensaje += `${a.accion}: ${a.cantidad}\n`;
+        });
+        
+        mensaje += `\nUsuarios más activos:\n`;
+        mensaje += `${'-'.repeat(40)}\n`;
+        stats.usuarios_activos.forEach(u => {
+            mensaje += `${u.nombre}: ${u.acciones} acciones\n`;
+        });
+        
+        alert(mensaje);
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al cargar estadísticas');
+    }
+}
+
+
+// ========== GRÁFICOS Y ESTADÍSTICAS ==========
+
+let chartEstadosSitios, chartActividadSemanal, chartTopClientes, chartTakedowns;
+
+async function cargarGraficos() {
+    try {
+        const response = await fetch(`${API_URL}/api/sitios/estadisticas`, { headers });
+        const stats = await response.json();
+        
+        // Destruir gráficos existentes antes de crear nuevos
+        if (chartEstadosSitios) chartEstadosSitios.destroy();
+        if (chartActividadSemanal) chartActividadSemanal.destroy();
+        if (chartTopClientes) chartTopClientes.destroy();
+        if (chartTakedowns) chartTakedowns.destroy();
+        
+        // Gráfico de sitios por estado
+        crearGraficoEstadosSitios(stats.sitios_por_estado);
+        
+        // Gráfico de actividad semanal
+        crearGraficoActividadSemanal(stats.actividad_semanal);
+        
+        // Gráfico top clientes
+        crearGraficoTopClientes(stats.top_clientes);
+        
+        // Gráfico takedowns
+        crearGraficoTakedowns(stats.takedowns_estados);
+        
+    } catch (error) {
+        console.error('Error cargando gráficos:', error);
+    }
+}
+
+function crearGraficoEstadosSitios(data) {
+    const ctx = document.getElementById('chartEstadosSitios');
+    if (!ctx) return;
+    
+    const estados = {
+        'pendiente': { label: 'Pendientes', color: '#ffc107' },
+        'validado': { label: 'Validados', color: '#dc3545' },
+        'falso_positivo': { label: 'Falsos Positivos', color: '#28a745' },
+        'takedown_enviado': { label: 'Takedown Enviado', color: '#17a2b8' },
+        'sitio_caido': { label: 'Sitio Caído', color: '#6c757d' }
+    };
+    
+    const labels = [];
+    const valores = [];
+    const colores = [];
+    
+    for (let estado in estados) {
+        if (data[estado]) {
+            labels.push(estados[estado].label);
+            valores.push(data[estado]);
+            colores.push(estados[estado].color);
+        }
+    }
+    
+    chartEstadosSitios = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: valores,
+                backgroundColor: colores
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+function crearGraficoActividadSemanal(data) {
+    const ctx = document.getElementById('chartActividadSemanal');
+    if (!ctx) return;
+    
+    // Ordenar por fecha
+    data.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    
+    const labels = data.map(d => {
+        const fecha = new Date(d.fecha);
+        return fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+    });
+    const valores = data.map(d => d.cantidad);
+    
+    chartActividadSemanal = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Sitios Reportados',
+                data: valores,
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+function crearGraficoTopClientes(data) {
+    const ctx = document.getElementById('chartTopClientes');
+    if (!ctx) return;
+    
+    const labels = data.map(c => c.nombre);
+    const valores = data.map(c => c.cantidad);
+    
+    chartTopClientes = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Sitios Reportados',
+                data: valores,
+                backgroundColor: [
+                    '#dc3545',
+                    '#fd7e14',
+                    '#ffc107',
+                    '#20c997',
+                    '#17a2b8'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+function crearGraficoTakedowns(data) {
+    const ctx = document.getElementById('chartTakedowns');
+    if (!ctx) return;
+    
+    const estados = {
+        'pendiente': { label: 'Pendientes', color: '#6c757d' },
+        'enviado': { label: 'Enviados', color: '#17a2b8' },
+        'confirmado': { label: 'Confirmados', color: '#28a745' },
+        'rechazado': { label: 'Rechazados', color: '#dc3545' }
+    };
+    
+    const labels = [];
+    const valores = [];
+    const colores = [];
+    
+    for (let estado in estados) {
+        if (data[estado]) {
+            labels.push(estados[estado].label);
+            valores.push(data[estado]);
+            colores.push(estados[estado].color);
+        }
+    }
+    
+    chartTakedowns = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: valores,
+                backgroundColor: colores
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+// ========== EXPORTAR CSV ==========
+
+// Modal exportar CSV
+async function showModalExportarCSV() {
+    document.getElementById('formExportarCSV').reset();
+    document.getElementById('infoExportacion').style.display = 'none';
+    document.getElementById('btnDescargarCSV').disabled = true;
+    
+    // Cargar clientes
+    const response = await fetch(`${API_URL}/api/clientes/`, { headers });
+    const clientes = await response.json();
+    
+    const select = document.getElementById('clienteExportar');
+    select.innerHTML = '<option value="">Seleccione un cliente...</option>' +
+        clientes.filter(c => c.activo).map(c => 
+            `<option value="${c.id}" data-nombre="${c.nombre}" data-dominio="${c.dominio_legitimo}">${c.nombre} (${c.dominio_legitimo})</option>`
+        ).join('');
+    
+    // Evento change para mostrar información
+    select.onchange = async function() {
+        const clienteId = this.value;
+        if (!clienteId) {
+            document.getElementById('infoExportacion').style.display = 'none';
+            document.getElementById('btnDescargarCSV').disabled = true;
+            return;
+        }
+        
+        const selectedOption = this.options[this.selectedIndex];
+        const clienteNombre = selectedOption.getAttribute('data-nombre');
+        const clienteDominio = selectedOption.getAttribute('data-dominio');
+        
+        // Obtener cantidad de sitios del cliente
+        try {
+            const sitiosResponse = await fetch(`${API_URL}/api/sitios/`, { headers });
+            const sitios = await sitiosResponse.json();
+            const sitiosCliente = sitios.filter(s => s.cliente_id == clienteId);
+            
+            document.getElementById('infoClienteNombre').textContent = clienteNombre;
+            document.getElementById('infoClienteDominio').textContent = clienteDominio;
+            document.getElementById('infoTotalSitios').textContent = sitiosCliente.length;
+            
+            if (sitiosCliente.length > 0) {
+                document.getElementById('infoExportacion').style.display = 'block';
+                document.getElementById('btnDescargarCSV').disabled = false;
+            } else {
+                document.getElementById('infoExportacion').style.display = 'none';
+                document.getElementById('btnDescargarCSV').disabled = true;
+                alert('⚠️ Este cliente no tiene sitios reportados para exportar');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error al verificar sitios del cliente');
+        }
+    };
+    
+    new bootstrap.Modal(document.getElementById('modalExportarCSV')).show();
+}
+
+// Descargar CSV
+async function descargarCSV() {
+    const clienteId = document.getElementById('clienteExportar').value;
+    
+    if (!clienteId) {
+        alert('Debe seleccionar un cliente');
+        return;
+    }
+    
+    try {
+        // Hacer petición para descargar
+        const response = await fetch(`${API_URL}/api/sitios/exportar-csv/${clienteId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+            return;
+        }
+        
+        // Obtener el blob y crear enlace de descarga
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        // Obtener nombre del archivo del header
+        const contentDisposition = response.headers.get('content-disposition');
+        let filename = 'reporte_sitios.csv';
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+            if (filenameMatch) {
+                filename = filenameMatch[1];
+            }
+        }
+        
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        alert('Reporte CSV descargado correctamente');
+        bootstrap.Modal.getInstance(document.getElementById('modalExportarCSV')).hide();
+        
+    } catch (error) {
+        console.error('Error descargando CSV:', error);
+        alert('Error al descargar el archivo CSV');
     }
 }

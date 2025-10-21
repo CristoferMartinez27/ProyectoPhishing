@@ -122,13 +122,24 @@ def eliminar_sitio(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
 ):
-    """Elimina un sitio reportado"""
+    """Elimina un sitio reportado y todos sus registros relacionados"""
     
     sitio = db.query(Sitio).filter(Sitio.id == sitio_id).first()
     if not sitio:
         raise HTTPException(status_code=404, detail="Sitio no encontrado")
     
     url_sitio = sitio.url
+    
+    # Eliminar primero los registros relacionados
+    from models.models import ValidacionApi, Takedown
+    
+    # Eliminar validaciones
+    db.query(ValidacionApi).filter(ValidacionApi.sitio_id == sitio_id).delete()
+    
+    # Eliminar takedowns
+    db.query(Takedown).filter(Takedown.sitio_id == sitio_id).delete()
+    
+    # Ahora eliminar el sitio
     db.delete(sitio)
     
     # Registrar en bitácora
@@ -158,12 +169,23 @@ def validar_sitio(
     resultados = []
     
     # Validar con VirusTotal
+    print("Validando con VirusTotal...")
     vt_result = validador.validar_virustotal(sitio.url)
     resultados.append(vt_result)
     
     # Validar con Google Safe Browsing
+    print("Validando con Google Safe Browsing...")
     gsb_result = validador.validar_google_safe_browsing(sitio.url)
     resultados.append(gsb_result)
+    
+    # Validar con AbuseIPDB
+    print("Validando con AbuseIPDB...")
+    abuse_result = validador.validar_abuseipdb(sitio.url)
+    resultados.append(abuse_result)
+    
+    # Guardar IP si se obtuvo de AbuseIPDB
+    if not abuse_result.get('error') and abuse_result.get('ip'):
+        sitio.ip = abuse_result.get('ip')
     
     # Contar cuántas APIs detectaron como malicioso
     detecciones_maliciosas = sum(1 for r in resultados if r.get('malicioso', False))
@@ -193,7 +215,7 @@ def validar_sitio(
     bitacora = Bitacora(
         usuario_id=current_user.id,
         accion="VALIDAR_SITIO",
-        detalle=f"Validó sitio {sitio.url} - Resultado: {'Malicioso' if sitio.es_malicioso else 'Limpio'}"
+        detalle=f"Validó sitio {sitio.url} - Resultado: {'Malicioso' if sitio.es_malicioso else 'Limpio'} ({detecciones_maliciosas}/3 APIs)"
     )
     db.add(bitacora)
     db.commit()
@@ -201,7 +223,127 @@ def validar_sitio(
     return {
         "sitio_id": sitio.id,
         "url": sitio.url,
+        "ip": sitio.ip,
         "es_malicioso": sitio.es_malicioso,
         "estado": sitio.estado.value,
+        "detecciones": f"{detecciones_maliciosas}/3",
         "validaciones": resultados
     }
+
+@router.get("/estadisticas")
+def obtener_estadisticas(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """Obtiene estadísticas para gráficos del dashboard"""
+    from sqlalchemy import func
+    from datetime import timedelta
+    
+    # Sitios por estado
+    estados = db.query(
+        Sitio.estado,
+        func.count(Sitio.id).label('cantidad')
+    ).group_by(Sitio.estado).all()
+    
+    sitios_por_estado = {e[0].value: e[1] for e in estados}
+    
+    # Sitios por cliente (top 5)
+    top_clientes = db.query(
+        Cliente.nombre,
+        func.count(Sitio.id).label('cantidad')
+    ).join(Sitio).group_by(Cliente.id).order_by(func.count(Sitio.id).desc()).limit(5).all()
+    
+    # Actividad últimos 7 días
+    hace_7_dias = datetime.utcnow() - timedelta(days=7)
+    actividad_semanal = db.query(
+        func.date(Sitio.fecha_reporte).label('fecha'),
+        func.count(Sitio.id).label('cantidad')
+    ).filter(Sitio.fecha_reporte >= hace_7_dias).group_by(func.date(Sitio.fecha_reporte)).all()
+    
+    # Takedowns por estado
+    from models.models import Takedown
+    takedowns_estados = db.query(
+        Takedown.estado,
+        func.count(Takedown.id).label('cantidad')
+    ).group_by(Takedown.estado).all()
+    
+    return {
+        "sitios_por_estado": sitios_por_estado,
+        "top_clientes": [{"nombre": c[0], "cantidad": c[1]} for c in top_clientes],
+        "actividad_semanal": [{"fecha": str(a[0]), "cantidad": a[1]} for a in actividad_semanal],
+        "takedowns_estados": {t[0].value: t[1] for t in takedowns_estados}
+    }
+
+@router.get("/exportar-csv/{cliente_id}")
+def exportar_sitios_csv(
+    cliente_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Exporta los sitios reportados de un cliente a CSV"""
+    from fastapi.responses import StreamingResponse
+    import io
+    import csv
+
+    # Verificar que el cliente existe
+    cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+    # Obtener sitios del cliente
+    sitios = (
+        db.query(Sitio)
+        .filter(Sitio.cliente_id == cliente_id)
+        .order_by(Sitio.fecha_reporte.desc())
+        .all()
+    )
+
+    if not sitios:
+        raise HTTPException(status_code=404, detail="No hay sitios reportados para este cliente")
+
+    # Crear CSV en memoria
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Encabezados
+    writer.writerow([
+        "ID","Cliente","URL","Dominio","IP","Estado","Es Malicioso",
+        "Reportado Por","Fecha Reporte","Fecha Validación","Fecha Caída","Notas"
+    ])
+
+    # Filas
+    for sitio in sitios:
+        writer.writerow([
+            sitio.id,
+            cliente.nombre,
+            sitio.url,
+            sitio.dominio or "",
+            sitio.ip or "",
+            sitio.estado.value,
+            "Sí" if sitio.es_malicioso else "No",
+            getattr(sitio.usuario_reporta, "nombre_completo", "") or "",
+            sitio.fecha_reporte.strftime("%Y-%m-%d %H:%M:%S") if sitio.fecha_reporte else "",
+            sitio.fecha_validacion.strftime("%Y-%m-%d %H:%M:%S") if sitio.fecha_validacion else "",
+            sitio.fecha_caida.strftime("%Y-%m-%d %H:%M:%S") if sitio.fecha_caida else "",
+            sitio.notas or "",
+        ])
+
+    # Bitácora
+    bitacora = Bitacora(
+        usuario_id=current_user.id,
+        accion="EXPORTAR_CSV",
+        detalle=f"Exportó reporte CSV del cliente: {cliente.nombre} ({len(sitios)} sitios)",
+    )
+    db.add(bitacora)
+    db.commit()
+
+    # Preparar respuesta
+    output.seek(0)
+    fecha_actual = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    nombre_archivo = f"reporte_{cliente.nombre.replace(' ', '_')}_{fecha_actual}.csv"
+
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode("utf-8-sig")),  # UTF-8 con BOM para Excel
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"},
+    )

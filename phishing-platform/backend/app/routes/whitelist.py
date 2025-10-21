@@ -58,7 +58,7 @@ def listar_whitelist_por_cliente(
 def agregar_a_whitelist(
     whitelist: WhitelistCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin)
+    current_user: Usuario = Depends(get_current_user)
 ):
     """Agrega una URL a la whitelist"""
     
@@ -111,7 +111,7 @@ def actualizar_whitelist(
     whitelist_id: int,
     whitelist_data: WhitelistUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin)
+    current_user: Usuario = Depends(get_current_user)
 ):
     """Actualiza una entrada de whitelist"""
     
@@ -150,7 +150,7 @@ def actualizar_whitelist(
 def eliminar_de_whitelist(
     whitelist_id: int,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin)
+    current_user: Usuario = Depends(get_current_user)
 ):
     """Elimina una URL de la whitelist"""
     

@@ -47,7 +47,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
                 if (data.usuario.rol === 'administrador') {
                     window.location.href = 'dashboard-admin.html';
                 } else {
-                    window.location.href = 'dashboard-analista.html';
+                    window.location.href = 'dashboard-admin.html'; // En este caso, ambos roles van al mismo dashboard
                 }
             }, 1500);
 

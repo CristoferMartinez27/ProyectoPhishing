@@ -71,8 +71,6 @@ This fraudulent website violates:
 - Anti-phishing regulations
 - Terms of Service of your hosting platform
 
-We reserve the right to pursue legal action if this matter is not resolved promptly.
-
 CONTACT INFORMATION:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 For any questions or to provide updates on this case, please contact us at this email address.

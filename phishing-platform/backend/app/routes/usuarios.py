@@ -4,22 +4,17 @@ from typing import List
 from models.database import get_db
 from models.models import Usuario, Rol, Bitacora
 from schemas.usuario import UsuarioCreate, UsuarioUpdate, UsuarioResponse
-from utils.auth import get_password_hash, require_admin
+from utils.auth import get_password_hash, require_admin, get_current_user
 from datetime import datetime
-
-#rom ..models.database import get_db
-#from ..models.models import Usuario, Rol, Bitacora
-#from ..schemas.usuario import UsuarioCreate, UsuarioUpdate, UsuarioResponse
-#from ..utils.auth import get_password_hash, require_admin
 
 router = APIRouter(prefix="/api/usuarios", tags=["Usuarios"])
 
 @router.get("/", response_model=List[UsuarioResponse])
 def listar_usuarios(
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin)
+    current_user: Usuario = Depends(get_current_user)
 ):
-    """Lista todos los usuarios (solo admin)"""
+    """Lista todos los usuarios"""
     usuarios = db.query(Usuario).all()
     
     return [
