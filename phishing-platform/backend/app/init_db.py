@@ -1,10 +1,6 @@
-from models.database import engine, Base
-from models.models import Rol, Usuario, Cliente, Whitelist, Sitio, ValidacionApi, Takedown, Bitacora, Estadistica
+from models.database import engine, Base, SessionLocal
+from models.models import Rol
 from sqlalchemy.orm import Session
-from models.database import SessionLocal
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def init_database():
     """Crea todas las tablas y datos iniciales"""
@@ -26,28 +22,8 @@ def init_database():
             db.add_all(roles)
             db.commit()
             print("✓ Roles creados")
-            
-            # Crear usuario administrador por defecto
-            print("\nCreando usuario administrador...")
-            rol_admin = db.query(Rol).filter(Rol.nombre == "administrador").first()
-            admin = Usuario(
-                nombre_completo="Administrador del Sistema",
-                correo="admin@phishing-platform.com",
-                nombre_usuario="admin",
-                contrasena_hash=pwd_context.hash("Admin123!"),
-                rol_id=rol_admin.id,
-                activo=True
-            )
-            db.add(admin)
-            db.commit()
-            print("✓ Usuario administrador creado")
-            print("\n" + "="*50)
-            print("CREDENCIALES DE ACCESO INICIAL:")
-            print("Usuario: admin")
-            print("Contraseña: Admin123!")
-            print("="*50 + "\n")
         else:
-            print("✓ Base de datos ya inicializada")
+            print("✓ Roles ya existentes, no se requiere acción")
             
     except Exception as e:
         print(f"✗ Error: {e}")
