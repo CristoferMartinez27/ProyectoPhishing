@@ -42,3 +42,32 @@ def health_check():
         "status": "healthy",
         "service": "phishing-platform-api"
     }
+
+@app.get("/test-smtp")
+def test_smtp_connection():
+    """Endpoint para probar la conexión SMTP"""
+    from app.services.email_service import EmailService
+    
+    email_service = EmailService()
+    
+    # Primero verificar configuración
+    if not email_service.verificar_configuracion():
+        return {
+            "success": False,
+            "error": "Configuración SMTP incompleta",
+            "smtp_user": email_service.smtp_user or "NO CONFIGURADO",
+            "smtp_host": email_service.smtp_host,
+            "smtp_port": email_service.smtp_port
+        }
+    
+    # Probar conexión
+    result = email_service.test_connection()
+    
+    return {
+        **result,
+        "smtp_config": {
+            "host": email_service.smtp_host,
+            "port": email_service.smtp_port,
+            "user": email_service.smtp_user
+        }
+    }

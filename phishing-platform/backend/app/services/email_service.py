@@ -1,5 +1,6 @@
 import os
 import smtplib
+import socket
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List
@@ -25,6 +26,48 @@ class EmailService:
             self.smtp_user,
             self.smtp_password
         ])
+    
+    def test_connection(self) -> dict:
+        """Prueba la conexión SMTP"""
+        if not self.verificar_configuracion():
+            return {
+                "success": False,
+                "error": "Configuración SMTP incompleta"
+            }
+        
+        try:
+            # Intentar resolver el hostname
+            socket.gethostbyname(self.smtp_host)
+            
+            # Intentar conectar
+            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as servidor:
+                servidor.starttls()
+                servidor.login(self.smtp_user, self.smtp_password)
+            
+            return {
+                "success": True,
+                "mensaje": "Conexión SMTP exitosa"
+            }
+        except socket.gaierror:
+            return {
+                "success": False,
+                "error": "No se puede resolver el hostname del servidor SMTP. Verifica la configuración de red."
+            }
+        except socket.timeout:
+            return {
+                "success": False,
+                "error": "Timeout al conectar con el servidor SMTP. El puerto 587 puede estar bloqueado."
+            }
+        except smtplib.SMTPAuthenticationError:
+            return {
+                "success": False,
+                "error": "Error de autenticación. Verifica usuario y contraseña de aplicación de Gmail."
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Error de conexión: {str(e)}"
+            }
     
     def enviar_email(
         self,
@@ -78,7 +121,8 @@ class EmailService:
                 todos_destinatarios.extend(bcc)
             
             # Conectar y enviar
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as servidor:
+            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=30) as servidor:
+                servidor.set_debuglevel(0)  # Cambiar a 1 para debug
                 servidor.starttls()
                 servidor.login(self.smtp_user, self.smtp_password)
                 servidor.sendmail(
@@ -93,10 +137,25 @@ class EmailService:
                 "destinatarios": todos_destinatarios
             }
             
+        except socket.gaierror as e:
+            return {
+                "success": False,
+                "error": f"Error de red: No se puede conectar al servidor SMTP. Railway puede estar bloqueando el puerto 587. Error: {str(e)}"
+            }
+        except socket.timeout:
+            return {
+                "success": False,
+                "error": "Timeout: El servidor SMTP no responde. El puerto 587 puede estar bloqueado por Railway."
+            }
         except smtplib.SMTPAuthenticationError:
             return {
                 "success": False,
-                "error": "Error de autenticación SMTP. Verifica tu usuario y contraseña."
+                "error": "Error de autenticación SMTP. Verifica tu usuario y contraseña de aplicación de Gmail."
+            }
+        except smtplib.SMTPRecipientsRefused as e:
+            return {
+                "success": False,
+                "error": f"Algunos destinatarios fueron rechazados: {str(e)}"
             }
         except smtplib.SMTPException as e:
             return {
@@ -106,7 +165,7 @@ class EmailService:
         except Exception as e:
             return {
                 "success": False,
-                "error": f"Error inesperado: {str(e)}"
+                "error": f"Error inesperado: {type(e).__name__} - {str(e)}"
             }
     
     def enviar_takedown(

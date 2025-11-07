@@ -235,6 +235,12 @@ async function guardarUsuario() {
     if (!esEdicion) {
         data.nombre_usuario = document.getElementById('nombreUsuario').value;
         data.contrasena = document.getElementById('contrasena').value;
+    } else {
+        // ✅ Si está editando y hay contraseña, incluirla
+        const nuevaContrasena = document.getElementById('contrasena').value;
+        if (nuevaContrasena) {
+            data.contrasena = nuevaContrasena;
+        }
     }
     
     try {

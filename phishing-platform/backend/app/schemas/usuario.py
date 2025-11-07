@@ -14,6 +14,7 @@ class UsuarioUpdate(BaseModel):
     correo: Optional[EmailStr] = None
     activo: Optional[bool] = None
     rol_id: Optional[int] = None
+    contrasena: Optional[str] = None  
 
 class UsuarioResponse(BaseModel):
     id: int

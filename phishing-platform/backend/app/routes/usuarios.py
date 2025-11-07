@@ -122,6 +122,7 @@ def actualizar_usuario(
     # Actualizar campos
     if usuario_data.nombre_completo:
         usuario.nombre_completo = usuario_data.nombre_completo
+    
     if usuario_data.correo:
         # Verificar que el correo no exista en otro usuario
         otro = db.query(Usuario).filter(
@@ -131,19 +132,29 @@ def actualizar_usuario(
         if otro:
             raise HTTPException(status_code=400, detail="El correo ya está en uso")
         usuario.correo = usuario_data.correo
+    
     if usuario_data.rol_id:
         usuario.rol_id = usuario_data.rol_id
+    
     if usuario_data.activo is not None:
         usuario.activo = usuario_data.activo
+    
+    # ✅ ACTUALIZAR CONTRASEÑA SI SE PROPORCIONA
+    if usuario_data.contrasena:
+        usuario.contrasena_hash = get_password_hash(usuario_data.contrasena)
     
     db.commit()
     db.refresh(usuario)
     
     # Registrar en bitácora
+    accion_detalle = f"Actualizó usuario: {usuario.nombre_usuario}"
+    if usuario_data.contrasena:
+        accion_detalle += " (incluyendo contraseña)"
+    
     bitacora = Bitacora(
         usuario_id=current_user.id,
         accion="ACTUALIZAR_USUARIO",
-        detalle=f"Actualizó usuario: {usuario.nombre_usuario}"
+        detalle=accion_detalle
     )
     db.add(bitacora)
     db.commit()
@@ -157,7 +168,6 @@ def actualizar_usuario(
         "activo": usuario.activo,
         "fecha_creacion": usuario.fecha_creacion
     }
-
 
 @router.get("/roles")
 def listar_roles(db: Session = Depends(get_db)):
