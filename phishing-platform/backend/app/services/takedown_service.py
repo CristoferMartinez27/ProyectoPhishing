@@ -132,5 +132,5 @@ Anti-Phishing Platform
             "samples@xcitium.com",              # Xcitium 
             "virus.samples@watchguard.com",     # WatchGuard 
             "submit@symantec.com",              # Symantec
-            "cristofermartinezmonroy@gmail.com" # Correo personal de pruebas
+            "akacriismartinezy@gmail.com" # Correo personal de pruebas
         ]
