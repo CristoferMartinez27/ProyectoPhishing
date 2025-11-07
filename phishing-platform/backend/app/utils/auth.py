@@ -9,8 +9,8 @@ import os
 from dotenv import load_dotenv
 from fastapi import HTTPException, status
 from fastapi import Depends
-from models.models import Usuario
-from models.database import get_db
+from app.models.models import Usuario
+from app.models.database import get_db
 
 load_dotenv()
 

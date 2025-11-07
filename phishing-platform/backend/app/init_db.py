@@ -1,6 +1,9 @@
-from models.database import engine, Base, SessionLocal
-from models.models import Rol
+from app.models.database import engine, Base, SessionLocal
+from app.models.models import Rol, Usuario, Cliente, Whitelist, Sitio, ValidacionApi, Takedown, Bitacora, Estadistica
 from sqlalchemy.orm import Session
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def init_database():
     """Crea todas las tablas y datos iniciales"""
