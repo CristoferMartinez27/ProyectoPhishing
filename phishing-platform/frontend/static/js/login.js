@@ -1,4 +1,4 @@
-const API_URL = 'https://proyectophishing-production.up.railway.app/';
+const API_URL = 'https://proyectophishing-production.up.railway.app';
 
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
