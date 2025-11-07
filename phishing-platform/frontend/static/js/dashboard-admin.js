@@ -1,4 +1,4 @@
-const API_URL = 'https://proyectophishing-production.up.railway.app/';
+const API_URL = 'https://proyectophishing-production.up.railway.app';
 let token = localStorage.getItem('access_token');
 let usuario = JSON.parse(localStorage.getItem('usuario'));
 
