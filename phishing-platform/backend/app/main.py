@@ -26,172 +26,19 @@ app.include_router(whitelist.router)
 app.include_router(takedown.router)
 app.include_router(bitacora.router)
 
-@app.get("/setup-database")
-def setup_database():
-    """Crea las tablas en la base de datos - USAR SOLO UNA VEZ"""
-    try:
-        from app.models.database import engine, Base, SessionLocal
-        from app.models.models import Rol, Usuario
-        from passlib.context import CryptContext
-        
-        # Configurar bcrypt con rounds más bajos para evitar problemas
-        pwd_context = CryptContext(
-            schemes=["bcrypt"],
-            deprecated="auto",
-            bcrypt__rounds=12,  # Reducir rounds puede ayudar
-            bcrypt__ident="2b"  # Usar explícitamente el identificador 2b
-        )
-        
-        # Crear todas las tablas
-        Base.metadata.create_all(bind=engine)
-        
-        db = SessionLocal()
-        try:
-            # Verificar si ya existen roles
-            rol_existente = db.query(Rol).first()
-            
-            if not rol_existente:
-                # Crear roles
-                roles = [
-                    Rol(nombre="administrador", descripcion="Acceso completo al sistema"),
-                    Rol(nombre="analista", descripcion="Acceso operativo para gestión de incidentes")
-                ]
-                db.add_all(roles)
-                db.commit()
-                
-                # Crear usuario admin por defecto
-                rol_admin = db.query(Rol).filter(Rol.nombre == "administrador").first()
-                
-                # Contraseña simple y corta
-                password = "Admin123!"
-                
-                # Crear usuario admin
-                admin = Usuario(
-                    nombre_completo="Administrador del Sistema",
-                    correo="admin@phishing-platform.com",
-                    nombre_usuario="admin",
-                    contrasena_hash=pwd_context.hash(password),
-                    rol_id=rol_admin.id,
-                    activo=True
-                )
-                db.add(admin)
-                db.commit()
-                
-                return {
-                    "success": True,
-                    "mensaje": "✅ Base de datos inicializada correctamente",
-                    "tablas_creadas": True,
-                    "roles_creados": True,
-                    "usuario_admin_creado": True,
-                    "credenciales": {
-                        "usuario": "admin",
-                        "password": "Admin123!"
-                    }
-                }
-            else:
-                return {
-                    "success": True,
-                    "mensaje": "✅ Base de datos ya está inicializada",
-                    "tablas_creadas": True,
-                    "roles_creados": False,
-                    "usuario_admin_creado": False,
-                    "nota": "Los roles y usuarios ya existen"
-                }
-                
-        finally:
-            db.close()
-            
-    except Exception as e:
-        import traceback
-        return {
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }
-
-@app.get("/create-admin-user")
-def create_admin_user():
-    """Crea el usuario administrador - USAR SOLO SI NO EXISTE"""
-    try:
-        from app.models.database import SessionLocal
-        from app.models.models import Rol, Usuario
-        from passlib.context import CryptContext
-        
-        # Configurar bcrypt con parámetros específicos
-        pwd_context = CryptContext(
-            schemes=["bcrypt"],
-            deprecated="auto",
-            bcrypt__rounds=12,
-            bcrypt__ident="2b"
-        )
-        
-        db = SessionLocal()
-        try:
-            # Verificar si ya existe el usuario admin
-            usuario_existente = db.query(Usuario).filter(
-                Usuario.nombre_usuario == "admin"
-            ).first()
-            
-            if usuario_existente:
-                return {
-                    "success": False,
-                    "mensaje": "⚠️ El usuario admin ya existe",
-                    "usuario": "admin"
-                }
-            
-            # Obtener el rol de administrador
-            rol_admin = db.query(Rol).filter(Rol.nombre == "administrador").first()
-            
-            if not rol_admin:
-                return {
-                    "success": False,
-                    "error": "No existe el rol de administrador. Ejecuta /setup-database primero"
-                }
-            
-            # Contraseña simple
-            password = "Admin123!"
-            
-            # Crear usuario admin
-            admin = Usuario(
-                nombre_completo="Administrador del Sistema",
-                correo="admin@phishing-platform.com",
-                nombre_usuario="admin",
-                contrasena_hash=pwd_context.hash(password),
-                rol_id=rol_admin.id,
-                activo=True
-            )
-            db.add(admin)
-            db.commit()
-            db.refresh(admin)
-            
-            return {
-                "success": True,
-                "mensaje": "✅ Usuario administrador creado correctamente",
-                "credenciales": {
-                    "usuario": "admin",
-                    "password": "Admin123!",
-                    "correo": "admin@phishing-platform.com"
-                },
-                "usuario_id": admin.id,
-                "rol_id": rol_admin.id
-            }
-            
-        finally:
-            db.close()
-            
-    except Exception as e:
-        import traceback
-        return {
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }
-
-
 @app.get("/")
 def root():
     return {
         "mensaje": "API Plataforma Anti-Phishing",
         "version": "1.0.0",
-        "estado": "activo"
+        "estado": "activo",
+        "documentacion": "/docs"
+    }
+
+@app.get("/health")
+def health_check():
+    """Endpoint para verificar que el servicio está funcionando"""
+    return {
+        "status": "healthy",
+        "service": "phishing-platform-api"
     }

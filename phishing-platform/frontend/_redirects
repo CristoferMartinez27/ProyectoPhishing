@@ -1,1 +1,2 @@
-/   /login.html   200
+/   /templates/login.html   200
+/*  /templates/:splat       200
