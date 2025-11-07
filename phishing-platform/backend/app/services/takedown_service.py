@@ -117,5 +117,5 @@ Anti-Phishing Platform
             "virus@nanoav.ru",                  # NANO Antivirus
             "virus.samples@watchguard.com",     # WatchGuard 
             "submit@symantec.com",              # Symantec
-            "akacriismartinezy@gmail.com" # Correo personal de pruebas
+            "akacriismartinez@gmail.com"        # Correo personal de confirmacion
         ]
