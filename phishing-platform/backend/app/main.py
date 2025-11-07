@@ -97,6 +97,73 @@ def setup_database():
             "error": str(e)
         }
 
+@app.get("/create-admin-user")
+def create_admin_user():
+    """Crea el usuario administrador - USAR SOLO SI NO EXISTE"""
+    try:
+        from app.models.database import SessionLocal
+        from app.models.models import Rol, Usuario
+        from passlib.context import CryptContext
+        
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        
+        db = SessionLocal()
+        try:
+            # Verificar si ya existe el usuario admin
+            usuario_existente = db.query(Usuario).filter(
+                Usuario.nombre_usuario == "admin"
+            ).first()
+            
+            if usuario_existente:
+                return {
+                    "success": False,
+                    "mensaje": "⚠️ El usuario admin ya existe",
+                    "usuario": "admin"
+                }
+            
+            # Obtener el rol de administrador
+            rol_admin = db.query(Rol).filter(Rol.nombre == "administrador").first()
+            
+            if not rol_admin:
+                return {
+                    "success": False,
+                    "error": "No existe el rol de administrador. Ejecuta /setup-database primero"
+                }
+            
+            # Crear usuario admin
+            admin = Usuario(
+                nombre_completo="Administrador del Sistema",
+                correo="admin@phishing-platform.com",
+                nombre_usuario="admin",
+                contrasena_hash=pwd_context.hash("Admin123!"),
+                rol_id=rol_admin.id,
+                activo=True
+            )
+            db.add(admin)
+            db.commit()
+            db.refresh(admin)
+            
+            return {
+                "success": True,
+                "mensaje": "✅ Usuario administrador creado correctamente",
+                "credenciales": {
+                    "usuario": "admin",
+                    "password": "Admin123!",
+                    "correo": "admin@phishing-platform.com"
+                },
+                "usuario_id": admin.id
+            }
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
 @app.get("/")
 def root():
     return {
@@ -104,3 +171,4 @@ def root():
         "version": "1.0.0",
         "estado": "activo"
     }
+
