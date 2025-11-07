@@ -25,8 +25,28 @@ def init_database():
             db.add_all(roles)
             db.commit()
             print("✓ Roles creados")
+            
+            # Crear usuario administrador por defecto
+            print("\nCreando usuario administrador...")
+            rol_admin = db.query(Rol).filter(Rol.nombre == "administrador").first()
+            admin = Usuario(
+                nombre_completo="Administrador del Sistema",
+                correo="admin@phishing-platform.com",
+                nombre_usuario="admin",
+                contrasena_hash=pwd_context.hash("Admin123!"),
+                rol_id=rol_admin.id,
+                activo=True
+            )
+            db.add(admin)
+            db.commit()
+            print("✓ Usuario administrador creado")
+            print("\n" + "="*50)
+            print("CREDENCIALES DE ACCESO INICIAL:")
+            print("Usuario: admin")
+            print("Contraseña: Admin123!")
+            print("="*50 + "\n")
         else:
-            print("✓ Roles ya existentes, no se requiere acción")
+            print("✓ Base de datos ya inicializada")
             
     except Exception as e:
         print(f"✗ Error: {e}")
