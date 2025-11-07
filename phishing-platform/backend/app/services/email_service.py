@@ -1,73 +1,43 @@
 import os
-import smtplib
-import socket
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests
 from typing import List
 from dotenv import load_dotenv
 
 load_dotenv()
 
 class EmailService:
-    """Servicio para envío de emails via SMTP"""
+    """Servicio para envío de emails via SendGrid API"""
     
     def __init__(self):
-        self.smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
-        self.smtp_port = int(os.getenv('SMTP_PORT', 587))
-        self.smtp_user = os.getenv('SMTP_USER')
-        self.smtp_password = os.getenv('SMTP_PASSWORD')
-        self.from_name = os.getenv('SMTP_FROM_NAME', 'PhishGuard Security Team')
+        self.sendgrid_api_key = os.getenv('SENDGRID_API_KEY')
+        self.from_email = os.getenv('FROM_EMAIL', 'cristofermartinezmonroy@gmail.com')
+        self.from_name = os.getenv('FROM_NAME', 'PhishGuard Security Team')
+        self.api_url = "https://api.sendgrid.com/v3/mail/send"
         
     def verificar_configuracion(self) -> bool:
-        """Verifica que las credenciales SMTP estén configuradas"""
-        return all([
-            self.smtp_host,
-            self.smtp_port,
-            self.smtp_user,
-            self.smtp_password
-        ])
+        """Verifica que la API Key de SendGrid esté configurada"""
+        return bool(self.sendgrid_api_key)
     
     def test_connection(self) -> dict:
-        """Prueba la conexión SMTP"""
+        """Prueba la configuración de SendGrid"""
         if not self.verificar_configuracion():
             return {
                 "success": False,
-                "error": "Configuración SMTP incompleta"
+                "error": "SENDGRID_API_KEY no está configurada"
             }
         
-        try:
-            # Intentar resolver el hostname
-            socket.gethostbyname(self.smtp_host)
-            
-            # Intentar conectar
-            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as servidor:
-                servidor.starttls()
-                servidor.login(self.smtp_user, self.smtp_password)
-            
-            return {
-                "success": True,
-                "mensaje": "Conexión SMTP exitosa"
-            }
-        except socket.gaierror:
+        # Verificar que la API key tenga el formato correcto
+        if not self.sendgrid_api_key.startswith('SG.'):
             return {
                 "success": False,
-                "error": "No se puede resolver el hostname del servidor SMTP. Verifica la configuración de red."
+                "error": "La API Key de SendGrid debe empezar con 'SG.'"
             }
-        except socket.timeout:
-            return {
-                "success": False,
-                "error": "Timeout al conectar con el servidor SMTP. El puerto 587 puede estar bloqueado."
-            }
-        except smtplib.SMTPAuthenticationError:
-            return {
-                "success": False,
-                "error": "Error de autenticación. Verifica usuario y contraseña de aplicación de Gmail."
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Error de conexión: {str(e)}"
-            }
+        
+        return {
+            "success": True,
+            "mensaje": "Configuración de SendGrid válida",
+            "from_email": self.from_email
+        }
     
     def enviar_email(
         self,
@@ -78,12 +48,12 @@ class EmailService:
         bcc: List[str] = None
     ) -> dict:
         """
-        Envía un email a uno o múltiples destinatarios
+        Envía un email usando la API de SendGrid
         
         Args:
             destinatarios: Lista de emails destinatarios principales
             asunto: Asunto del email
-            cuerpo: Cuerpo del email (puede ser texto plano o HTML)
+            cuerpo: Cuerpo del email (texto plano)
             cc: Lista de emails en copia (opcional)
             bcc: Lista de emails en copia oculta (opcional)
             
@@ -91,76 +61,88 @@ class EmailService:
             dict con status y mensaje
         """
         
-        # Verificar configuración
         if not self.verificar_configuracion():
             return {
                 "success": False,
-                "error": "Configuración SMTP incompleta. Revise las variables de entorno."
+                "error": "SENDGRID_API_KEY no está configurada. Configúrala en las variables de entorno de Railway."
             }
         
         try:
-            # Crear mensaje
-            mensaje = MIMEMultipart('alternative')
-            mensaje['From'] = f"{self.from_name} <{self.smtp_user}>"
-            mensaje['To'] = ", ".join(destinatarios)
-            mensaje['Subject'] = asunto
+            # Construir lista de destinatarios en formato SendGrid
+            to_list = [{"email": email} for email in destinatarios]
+            
+            # Construir payload
+            payload = {
+                "personalizations": [{
+                    "to": to_list,
+                    "subject": asunto
+                }],
+                "from": {
+                    "email": self.from_email,
+                    "name": self.from_name
+                },
+                "content": [{
+                    "type": "text/plain",
+                    "value": cuerpo
+                }]
+            }
             
             # Agregar CC si existe
             if cc:
-                mensaje['Cc'] = ", ".join(cc)
+                payload["personalizations"][0]["cc"] = [{"email": email} for email in cc]
             
-            # Adjuntar cuerpo
-            parte_texto = MIMEText(cuerpo, 'plain', 'utf-8')
-            mensaje.attach(parte_texto)
-            
-            # Preparar lista completa de destinatarios
-            todos_destinatarios = destinatarios.copy()
-            if cc:
-                todos_destinatarios.extend(cc)
+            # Agregar BCC si existe
             if bcc:
-                todos_destinatarios.extend(bcc)
+                payload["personalizations"][0]["bcc"] = [{"email": email} for email in bcc]
             
-            # Conectar y enviar
-            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=30) as servidor:
-                servidor.set_debuglevel(0)  # Cambiar a 1 para debug
-                servidor.starttls()
-                servidor.login(self.smtp_user, self.smtp_password)
-                servidor.sendmail(
-                    self.smtp_user,
-                    todos_destinatarios,
-                    mensaje.as_string()
-                )
-            
-            return {
-                "success": True,
-                "mensaje": f"Email enviado exitosamente a {len(todos_destinatarios)} destinatario(s)",
-                "destinatarios": todos_destinatarios
+            # Headers para la API
+            headers = {
+                "Authorization": f"Bearer {self.sendgrid_api_key}",
+                "Content-Type": "application/json"
             }
             
-        except socket.gaierror as e:
+            # Enviar petición
+            response = requests.post(
+                self.api_url,
+                json=payload,
+                headers=headers,
+                timeout=30
+            )
+            
+            # Verificar respuesta
+            if response.status_code == 202:
+                total_destinatarios = len(destinatarios) + (len(cc) if cc else 0) + (len(bcc) if bcc else 0)
+                return {
+                    "success": True,
+                    "mensaje": f"Email enviado exitosamente a {total_destinatarios} destinatario(s)",
+                    "destinatarios": destinatarios + (cc if cc else []) + (bcc if bcc else [])
+                }
+            elif response.status_code == 401:
+                return {
+                    "success": False,
+                    "error": "API Key de SendGrid inválida. Verifica que sea correcta y tenga permisos 'Mail Send'."
+                }
+            elif response.status_code == 403:
+                return {
+                    "success": False,
+                    "error": "Acceso denegado. Verifica que tu remitente esté verificado en SendGrid (Sender Authentication)."
+                }
+            else:
+                error_data = response.json() if response.text else {}
+                return {
+                    "success": False,
+                    "error": f"Error de SendGrid ({response.status_code}): {error_data.get('errors', [{}])[0].get('message', 'Error desconocido')}"
+                }
+            
+        except requests.exceptions.Timeout:
             return {
                 "success": False,
-                "error": f"Error de red: No se puede conectar al servidor SMTP. Railway puede estar bloqueando el puerto 587. Error: {str(e)}"
+                "error": "Timeout al conectar con SendGrid API"
             }
-        except socket.timeout:
+        except requests.exceptions.RequestException as e:
             return {
                 "success": False,
-                "error": "Timeout: El servidor SMTP no responde. El puerto 587 puede estar bloqueado por Railway."
-            }
-        except smtplib.SMTPAuthenticationError:
-            return {
-                "success": False,
-                "error": "Error de autenticación SMTP. Verifica tu usuario y contraseña de aplicación de Gmail."
-            }
-        except smtplib.SMTPRecipientsRefused as e:
-            return {
-                "success": False,
-                "error": f"Algunos destinatarios fueron rechazados: {str(e)}"
-            }
-        except smtplib.SMTPException as e:
-            return {
-                "success": False,
-                "error": f"Error SMTP: {str(e)}"
+                "error": f"Error de red al conectar con SendGrid: {str(e)}"
             }
         except Exception as e:
             return {

@@ -43,31 +43,22 @@ def health_check():
         "service": "phishing-platform-api"
     }
 
-@app.get("/test-smtp")
-def test_smtp_connection():
-    """Endpoint para probar la conexión SMTP"""
+@app.get("/test-email")
+def test_email_service():
+    """Endpoint para probar el servicio de email (SendGrid API)"""
     from app.services.email_service import EmailService
     
     email_service = EmailService()
     
-    # Primero verificar configuración
+    # Verificar configuración
     if not email_service.verificar_configuracion():
         return {
             "success": False,
-            "error": "Configuración SMTP incompleta",
-            "smtp_user": email_service.smtp_user or "NO CONFIGURADO",
-            "smtp_host": email_service.smtp_host,
-            "smtp_port": email_service.smtp_port
+            "error": "SENDGRID_API_KEY no está configurada",
+            "instrucciones": "Configura SENDGRID_API_KEY en las variables de entorno de Railway"
         }
     
-    # Probar conexión
+    # Probar configuración
     result = email_service.test_connection()
     
-    return {
-        **result,
-        "smtp_config": {
-            "host": email_service.smtp_host,
-            "port": email_service.smtp_port,
-            "user": email_service.smtp_user
-        }
-    }
+    return result
