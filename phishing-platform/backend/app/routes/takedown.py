@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from models.database import get_db
-from models.models import Takedown, Sitio, Cliente, Bitacora, Usuario
-from schemas.takedown import TakedownCreate, TakedownUpdate, TakedownResponse
-from services.takedown_service import TakedownService
-from utils.auth import get_current_user
+from app.models.database import get_db
+from app.models.models import Takedown, Sitio, Cliente, Bitacora, Usuario
+from app.schemas.takedown import TakedownCreate, TakedownUpdate, TakedownResponse
+from app.services.takedown_service import TakedownService
+from app.utils.auth import get_current_user
 from datetime import datetime
-from services.email_service import EmailService
+from app.services.email_service import EmailService
 
 router = APIRouter(prefix="/api/takedown", tags=["Takedown"])
 

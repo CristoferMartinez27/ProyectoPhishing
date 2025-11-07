@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from models.database import get_db
-from models.models import Whitelist, Cliente, Bitacora, Usuario
-from schemas.whitelist import WhitelistCreate, WhitelistUpdate, WhitelistResponse
-from utils.auth import get_current_user, require_admin
+from app.models.database import get_db
+from app.models.models import Whitelist, Cliente, Bitacora, Usuario
+from app.schemas.whitelist import WhitelistCreate, WhitelistUpdate, WhitelistResponse
+from app.utils.auth import get_current_user, require_admin
 from datetime import datetime
 
 router = APIRouter(prefix="/api/whitelist", tags=["Whitelist"])

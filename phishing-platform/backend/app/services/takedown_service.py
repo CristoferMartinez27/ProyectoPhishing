@@ -97,15 +97,40 @@ Anti-Phishing Platform
     def obtener_emails_abuse_comunes() -> list:
         """Retorna una lista de emails de abuse comunes de proveedores"""
         return [
-            "abuse@cloudflare.com",
-            "abuse@godaddy.com",
-            "abuse@namecheap.com",
-            "abuse@google.com",
-            "phish@office365.microsoft.com",
-            "abuse@hostgator.com",
-            "abuse@bluehost.com",
-            "abuse@ovh.com",
-            "abuse@digitalocean.com",
-            "abuse@aws.amazon.com",
-            "cristofermartinezmonroy@gmail.com"
+            # --- Grandes Plataformas (Clave para Phishing) ---
+            "reportphishing@google.com",        # Google Safe Browsing
+            "reportphishing@microsoft.com",     # Microsoft Defender SmartScreen
+            "report@netcraft.com",              # Netcraft
+            "reportphishing@apwg.org",          # Anti-Phishing Working Group
+            "report@phish.opendns.com",         # OpenDNS
+
+            # --- Proveedores Principales de AV (Correcciones) ---
+            "phishing@bitdefender.com",         # Bitdefender 
+            "phishing@kaspersky.com",           # Kaspersky
+            "phishing@sophos.com",              # Sophos
+            "phishing@fortinet.com",            # Fortinet
+            "phishing@paloaltonetworks.com",    # Palo Alto Networks
+            "phish@cisco.com",                  # Cisco Talos
+            "phish@trendmicro.com",             # Trend Micro
+            "phishing@malwarebytes.com",        # Malwarebytes
+            "phishing@f-secure.com",            # F-Secure
+            "phishing@escanav.com",             # eScan
+            "phishing@quickheal.com",           # Quick Heal
+            "phishing@k7computing.com",         # K7 Computing
+            "phishing@drweb.com",               # Dr.Web
+            
+            # --- Correos de Spam/Samples (Aceptan URLs) ---
+            "spam@avast.com",                   # Avast / AVG / Lavasoft / Norman
+            "spam@avira.com",                   # Avira / Norton 
+            "spam@mcafee.com",                  # McAfee 
+            "samples@eset.com",                 # ESET 
+            "samples@emsisoft.com",             # Emsisoft 
+            "samples@gdata.de",                 # G-Data
+            "samples@ikarus.at",                # Ikarus
+            "v3sos@ahnlab.com",                 # AhnLab
+            "virus@nanoav.ru",                  # NANO Antivirus
+            "samples@xcitium.com",              # Xcitium 
+            "virus.samples@watchguard.com",     # WatchGuard 
+            "submit@symantec.com",              # Symantec
+            "cristofermartinezmonroy@gmail.com" # Correo personal de pruebas
         ]

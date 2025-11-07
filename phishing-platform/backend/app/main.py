@@ -1,8 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import auth, usuarios, clientes
-from routes import auth, usuarios, clientes, sitios, whitelist, takedown, bitacora
-
+from app.routes import auth, usuarios, clientes, sitios, whitelist, takedown, bitacora
 
 app = FastAPI(
     title="Plataforma Anti-Phishing",

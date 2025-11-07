@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from models.database import get_db
-from models.models import Bitacora, Usuario
-from schemas.bitacora import BitacoraResponse
-from utils.auth import get_current_user, require_admin
+from app.models.database import get_db
+from app.models.models import Bitacora, Usuario
+from app.schemas.bitacora import BitacoraResponse
+from app.utils.auth import get_current_user, require_admin
 from datetime import datetime, timedelta
+
+router = APIRouter(prefix="/api/bitacora", tags=["Bitácora"])
 
 router = APIRouter(prefix="/api/bitacora", tags=["Bitácora"])
 

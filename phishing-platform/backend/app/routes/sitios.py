@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from models.database import get_db
-from models.models import Sitio, Cliente, Usuario, Bitacora, Whitelist
-from schemas.sitio import SitioCreate, SitioResponse
-from utils.auth import get_current_user
+from app.models.database import get_db
+from app.models.models import Sitio, Cliente, Usuario, Bitacora, Whitelist
+from app.schemas.sitio import SitioCreate, SitioResponse
+from app.utils.auth import get_current_user
 from datetime import datetime
 from urllib.parse import urlparse
-from services.validacion_apis import ValidadorAPIs
+from app.services.validacion_apis import ValidadorAPIs
 
 router = APIRouter(prefix="/api/sitios", tags=["Sitios"])
 
@@ -131,7 +131,7 @@ def eliminar_sitio(
     url_sitio = sitio.url
     
     # Eliminar primero los registros relacionados
-    from models.models import ValidacionApi, Takedown
+    from app.models.models import ValidacionApi, Takedown
     
     # Eliminar validaciones
     db.query(ValidacionApi).filter(ValidacionApi.sitio_id == sitio_id).delete()
@@ -196,7 +196,7 @@ def validar_sitio(
     sitio.fecha_validacion = datetime.utcnow()
     
     # Guardar validaciones en la tabla
-    from models.models import ValidacionApi
+    from app.models.models import ValidacionApi
     import json
     
     for resultado in resultados:
@@ -261,7 +261,7 @@ def obtener_estadisticas(
     ).filter(Sitio.fecha_reporte >= hace_7_dias).group_by(func.date(Sitio.fecha_reporte)).all()
     
     # Takedowns por estado
-    from models.models import Takedown
+    from app.models.models import Takedown
     takedowns_estados = db.query(
         Takedown.estado,
         func.count(Takedown.id).label('cantidad')
@@ -343,7 +343,7 @@ def exportar_sitios_csv(
     nombre_archivo = f"reporte_{cliente.nombre.replace(' ', '_')}_{fecha_actual}.csv"
 
     return StreamingResponse(
-        io.BytesIO(output.getvalue().encode("utf-8-sig")),  # UTF-8 con BOM para Excel
+        io.BytesIO(output.getvalue().encode("utf-8-sig")),
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"},
     )
