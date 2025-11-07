@@ -3,7 +3,13 @@ from app.models.models import Rol, Usuario, Cliente, Whitelist, Sitio, Validacio
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Configurar bcrypt con parámetros específicos
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12,
+    bcrypt__ident="2b"
+)
 
 def init_database():
     """Crea todas las tablas y datos iniciales"""
@@ -29,11 +35,14 @@ def init_database():
             # Crear usuario administrador por defecto
             print("\nCreando usuario administrador...")
             rol_admin = db.query(Rol).filter(Rol.nombre == "administrador").first()
+            
+            password = "Admin123!"
+            
             admin = Usuario(
                 nombre_completo="Administrador del Sistema",
                 correo="admin@phishing-platform.com",
                 nombre_usuario="admin",
-                contrasena_hash=pwd_context.hash("Admin123!"),
+                contrasena_hash=pwd_context.hash(password),
                 rol_id=rol_admin.id,
                 activo=True
             )
@@ -50,6 +59,8 @@ def init_database():
             
     except Exception as e:
         print(f"✗ Error: {e}")
+        import traceback
+        print(traceback.format_exc())
         db.rollback()
     finally:
         db.close()

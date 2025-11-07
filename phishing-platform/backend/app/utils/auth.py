@@ -7,8 +7,6 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 import os
 from dotenv import load_dotenv
-from fastapi import HTTPException, status
-from fastapi import Depends
 from app.models.models import Usuario
 from app.models.database import get_db
 
@@ -18,7 +16,14 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Configurar bcrypt con parámetros específicos para evitar problemas
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12,
+    bcrypt__ident="2b"
+)
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -27,6 +32,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     """Genera hash de contraseña"""
+    # Asegurar que la contraseña no exceda 72 bytes
+    if len(password.encode('utf-8')) > 72:
+        raise ValueError("La contraseña no puede exceder 72 bytes")
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -48,10 +56,6 @@ def verify_token(token: str):
         return payload
     except JWTError:
         return None
-    
-
-    #####
-
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     """Obtiene el usuario actual desde el token"""
@@ -69,7 +73,6 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if username is None:
         raise credentials_exception
     
-    from models.models import Usuario
     usuario = db.query(Usuario).filter(Usuario.nombre_usuario == username).first()
     if usuario is None:
         raise credentials_exception

@@ -26,7 +26,6 @@ app.include_router(whitelist.router)
 app.include_router(takedown.router)
 app.include_router(bitacora.router)
 
-# ⬇️ AGREGAR ESTE ENDPOINT AQUÍ ⬇️
 @app.get("/setup-database")
 def setup_database():
     """Crea las tablas en la base de datos - USAR SOLO UNA VEZ"""
@@ -35,7 +34,13 @@ def setup_database():
         from app.models.models import Rol, Usuario
         from passlib.context import CryptContext
         
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        # Configurar bcrypt con rounds más bajos para evitar problemas
+        pwd_context = CryptContext(
+            schemes=["bcrypt"],
+            deprecated="auto",
+            bcrypt__rounds=12,  # Reducir rounds puede ayudar
+            bcrypt__ident="2b"  # Usar explícitamente el identificador 2b
+        )
         
         # Crear todas las tablas
         Base.metadata.create_all(bind=engine)
@@ -56,11 +61,16 @@ def setup_database():
                 
                 # Crear usuario admin por defecto
                 rol_admin = db.query(Rol).filter(Rol.nombre == "administrador").first()
+                
+                # Contraseña simple y corta
+                password = "Admin123!"
+                
+                # Crear usuario admin
                 admin = Usuario(
                     nombre_completo="Administrador del Sistema",
                     correo="admin@phishing-platform.com",
                     nombre_usuario="admin",
-                    contrasena_hash=pwd_context.hash("Admin123!"),
+                    contrasena_hash=pwd_context.hash(password),
                     rol_id=rol_admin.id,
                     activo=True
                 )
@@ -92,9 +102,11 @@ def setup_database():
             db.close()
             
     except Exception as e:
+        import traceback
         return {
             "success": False,
-            "error": str(e)
+            "error": str(e),
+            "traceback": traceback.format_exc()
         }
 
 @app.get("/create-admin-user")
@@ -105,7 +117,13 @@ def create_admin_user():
         from app.models.models import Rol, Usuario
         from passlib.context import CryptContext
         
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        # Configurar bcrypt con parámetros específicos
+        pwd_context = CryptContext(
+            schemes=["bcrypt"],
+            deprecated="auto",
+            bcrypt__rounds=12,
+            bcrypt__ident="2b"
+        )
         
         db = SessionLocal()
         try:
@@ -133,15 +151,12 @@ def create_admin_user():
             # Contraseña simple
             password = "Admin123!"
             
-            # IMPORTANTE: Limitar a 72 bytes antes de hashear
-            password_truncated = password[:72]
-            
             # Crear usuario admin
             admin = Usuario(
                 nombre_completo="Administrador del Sistema",
                 correo="admin@phishing-platform.com",
                 nombre_usuario="admin",
-                contrasena_hash=pwd_context.hash(password_truncated),
+                contrasena_hash=pwd_context.hash(password),
                 rol_id=rol_admin.id,
                 activo=True
             )
@@ -180,4 +195,3 @@ def root():
         "version": "1.0.0",
         "estado": "activo"
     }
-
