@@ -130,12 +130,18 @@ def create_admin_user():
                     "error": "No existe el rol de administrador. Ejecuta /setup-database primero"
                 }
             
+            # Contraseña simple
+            password = "Admin123!"
+            
+            # IMPORTANTE: Limitar a 72 bytes antes de hashear
+            password_truncated = password[:72]
+            
             # Crear usuario admin
             admin = Usuario(
                 nombre_completo="Administrador del Sistema",
                 correo="admin@phishing-platform.com",
                 nombre_usuario="admin",
-                contrasena_hash=pwd_context.hash("Admin123!"),
+                contrasena_hash=pwd_context.hash(password_truncated),
                 rol_id=rol_admin.id,
                 activo=True
             )
@@ -151,16 +157,19 @@ def create_admin_user():
                     "password": "Admin123!",
                     "correo": "admin@phishing-platform.com"
                 },
-                "usuario_id": admin.id
+                "usuario_id": admin.id,
+                "rol_id": rol_admin.id
             }
             
         finally:
             db.close()
             
     except Exception as e:
+        import traceback
         return {
             "success": False,
-            "error": str(e)
+            "error": str(e),
+            "traceback": traceback.format_exc()
         }
 
 
