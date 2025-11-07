@@ -21,13 +21,81 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(usuarios.router)
 app.include_router(clientes.router)
-app.include_router(auth.router)
-app.include_router(usuarios.router)
-app.include_router(clientes.router)
 app.include_router(sitios.router)
 app.include_router(whitelist.router)
 app.include_router(takedown.router)
 app.include_router(bitacora.router)
+
+# ⬇️ AGREGAR ESTE ENDPOINT AQUÍ ⬇️
+@app.get("/setup-database")
+def setup_database():
+    """Crea las tablas en la base de datos - USAR SOLO UNA VEZ"""
+    try:
+        from app.models.database import engine, Base, SessionLocal
+        from app.models.models import Rol, Usuario
+        from passlib.context import CryptContext
+        
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        
+        # Crear todas las tablas
+        Base.metadata.create_all(bind=engine)
+        
+        db = SessionLocal()
+        try:
+            # Verificar si ya existen roles
+            rol_existente = db.query(Rol).first()
+            
+            if not rol_existente:
+                # Crear roles
+                roles = [
+                    Rol(nombre="administrador", descripcion="Acceso completo al sistema"),
+                    Rol(nombre="analista", descripcion="Acceso operativo para gestión de incidentes")
+                ]
+                db.add_all(roles)
+                db.commit()
+                
+                # Crear usuario admin por defecto
+                rol_admin = db.query(Rol).filter(Rol.nombre == "administrador").first()
+                admin = Usuario(
+                    nombre_completo="Administrador del Sistema",
+                    correo="admin@phishing-platform.com",
+                    nombre_usuario="admin",
+                    contrasena_hash=pwd_context.hash("Admin123!"),
+                    rol_id=rol_admin.id,
+                    activo=True
+                )
+                db.add(admin)
+                db.commit()
+                
+                return {
+                    "success": True,
+                    "mensaje": "✅ Base de datos inicializada correctamente",
+                    "tablas_creadas": True,
+                    "roles_creados": True,
+                    "usuario_admin_creado": True,
+                    "credenciales": {
+                        "usuario": "admin",
+                        "password": "Admin123!"
+                    }
+                }
+            else:
+                return {
+                    "success": True,
+                    "mensaje": "✅ Base de datos ya está inicializada",
+                    "tablas_creadas": True,
+                    "roles_creados": False,
+                    "usuario_admin_creado": False,
+                    "nota": "Los roles y usuarios ya existen"
+                }
+                
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 @app.get("/")
 def root():
