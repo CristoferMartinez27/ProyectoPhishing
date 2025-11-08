@@ -6,38 +6,63 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class EmailService:
-    """Servicio para envío de emails via SendGrid API"""
+    """Servicio para envío de emails via Brevo API (antes Sendinblue)"""
     
     def __init__(self):
-        self.sendgrid_api_key = os.getenv('SENDGRID_API_KEY')
+        self.brevo_api_key = os.getenv('BREVO_API_KEY')
         self.from_email = os.getenv('FROM_EMAIL', 'cristofermartinezmonroy@gmail.com')
         self.from_name = os.getenv('FROM_NAME', 'PhishGuard Security Team')
-        self.api_url = "https://api.sendgrid.com/v3/mail/send"
+        self.api_url = "https://api.brevo.com/v3/smtp/email"
         
     def verificar_configuracion(self) -> bool:
-        """Verifica que la API Key de SendGrid esté configurada"""
-        return bool(self.sendgrid_api_key)
+        """Verifica que la API Key de Brevo esté configurada"""
+        return bool(self.brevo_api_key)
     
     def test_connection(self) -> dict:
-        """Prueba la configuración de SendGrid"""
+        """Prueba la configuración de Brevo"""
         if not self.verificar_configuracion():
             return {
                 "success": False,
-                "error": "SENDGRID_API_KEY no está configurada"
+                "error": "BREVO_API_KEY no está configurada"
             }
         
-        # Verificar que la API key tenga el formato correcto
-        if not self.sendgrid_api_key.startswith('SG.'):
+        # Hacer una petición de prueba a la API
+        headers = {
+            "api-key": self.brevo_api_key,
+            "Content-Type": "application/json"
+        }
+        
+        try:
+            # Endpoint para obtener info de la cuenta
+            response = requests.get(
+                "https://api.brevo.com/v3/account",
+                headers=headers,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                account_info = response.json()
+                return {
+                    "success": True,
+                    "mensaje": "Configuración de Brevo válida",
+                    "from_email": self.from_email,
+                    "plan": account_info.get("plan", [{}])[0].get("type", "unknown") if account_info.get("plan") else "unknown"
+                }
+            elif response.status_code == 401:
+                return {
+                    "success": False,
+                    "error": "API Key de Brevo inválida"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Error al verificar cuenta de Brevo: {response.status_code}"
+                }
+        except Exception as e:
             return {
                 "success": False,
-                "error": "La API Key de SendGrid debe empezar con 'SG.'"
+                "error": f"Error al conectar con Brevo: {str(e)}"
             }
-        
-        return {
-            "success": True,
-            "mensaje": "Configuración de SendGrid válida",
-            "from_email": self.from_email
-        }
     
     def enviar_email(
         self,
@@ -48,7 +73,7 @@ class EmailService:
         bcc: List[str] = None
     ) -> dict:
         """
-        Envía un email usando la API de SendGrid
+        Envía un email usando la API de Brevo
         
         Args:
             destinatarios: Lista de emails destinatarios principales
@@ -64,40 +89,32 @@ class EmailService:
         if not self.verificar_configuracion():
             return {
                 "success": False,
-                "error": "SENDGRID_API_KEY no está configurada. Configúrala en las variables de entorno de Railway."
+                "error": "BREVO_API_KEY no está configurada. Configúrala en las variables de entorno de Railway."
             }
         
         try:
-            # Construir lista de destinatarios en formato SendGrid
-            to_list = [{"email": email} for email in destinatarios]
-            
-            # Construir payload
+            # Construir payload para Brevo
             payload = {
-                "personalizations": [{
-                    "to": to_list,
-                    "subject": asunto
-                }],
-                "from": {
-                    "email": self.from_email,
-                    "name": self.from_name
+                "sender": {
+                    "name": self.from_name,
+                    "email": self.from_email
                 },
-                "content": [{
-                    "type": "text/plain",
-                    "value": cuerpo
-                }]
+                "to": [{"email": email} for email in destinatarios],
+                "subject": asunto,
+                "textContent": cuerpo
             }
             
             # Agregar CC si existe
             if cc:
-                payload["personalizations"][0]["cc"] = [{"email": email} for email in cc]
+                payload["cc"] = [{"email": email} for email in cc]
             
             # Agregar BCC si existe
             if bcc:
-                payload["personalizations"][0]["bcc"] = [{"email": email} for email in bcc]
+                payload["bcc"] = [{"email": email} for email in bcc]
             
             # Headers para la API
             headers = {
-                "Authorization": f"Bearer {self.sendgrid_api_key}",
+                "api-key": self.brevo_api_key,
                 "Content-Type": "application/json"
             }
             
@@ -110,39 +127,42 @@ class EmailService:
             )
             
             # Verificar respuesta
-            if response.status_code == 202:
+            if response.status_code == 201:
                 total_destinatarios = len(destinatarios) + (len(cc) if cc else 0) + (len(bcc) if bcc else 0)
+                response_data = response.json()
                 return {
                     "success": True,
                     "mensaje": f"Email enviado exitosamente a {total_destinatarios} destinatario(s)",
-                    "destinatarios": destinatarios + (cc if cc else []) + (bcc if bcc else [])
+                    "destinatarios": destinatarios + (cc if cc else []) + (bcc if bcc else []),
+                    "message_id": response_data.get("messageId")
                 }
             elif response.status_code == 401:
                 return {
                     "success": False,
-                    "error": "API Key de SendGrid inválida. Verifica que sea correcta y tenga permisos 'Mail Send'."
+                    "error": "API Key de Brevo inválida. Verifica que sea correcta."
                 }
-            elif response.status_code == 403:
+            elif response.status_code == 400:
+                error_data = response.json()
                 return {
                     "success": False,
-                    "error": "Acceso denegado. Verifica que tu remitente esté verificado en SendGrid (Sender Authentication)."
+                    "error": f"Datos inválidos: {error_data.get('message', 'Error desconocido')}"
                 }
             else:
                 error_data = response.json() if response.text else {}
                 return {
                     "success": False,
-                    "error": f"Error de SendGrid ({response.status_code}): {error_data.get('errors', [{}])[0].get('message', 'Error desconocido')}"
+                    "error": f"Error de Brevo ({response.status_code}): {error_data.get('message', 'Error desconocido')}"
                 }
             
         except requests.exceptions.Timeout:
             return {
                 "success": False,
-                "error": "Timeout al conectar con SendGrid API"
+                "error": "Timeout al conectar con Brevo API"
             }
         except requests.exceptions.RequestException as e:
             return {
                 "success": False,
-                "error": f"Error de red al conectar con SendGrid: {str(e)}"
+                "error": f"Error de red al conectar con Brevo: {str(e)}"
             }
         except Exception as e:
             return {

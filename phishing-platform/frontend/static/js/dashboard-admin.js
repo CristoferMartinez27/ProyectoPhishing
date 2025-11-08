@@ -383,12 +383,17 @@ async function guardarCliente() {
     const clienteId = document.getElementById('clienteId').value;
     const esEdicion = clienteId !== '';
     
+    // ✅ SOLUCIÓN: Convertir strings vacíos a null
+    const nombreContacto = document.getElementById('contactoNombre').value.trim();
+    const correoContacto = document.getElementById('contactoCorreo').value.trim();
+    const telefonoContacto = document.getElementById('contactoTelefono').value.trim();
+    
     const data = {
         nombre: document.getElementById('nombreCliente').value,
         dominio_legitimo: document.getElementById('dominioLegitimo').value,
-        contacto_nombre: document.getElementById('contactoNombre').value || null,
-        contacto_correo: document.getElementById('contactoCorreo').value || null,
-        contacto_telefono: document.getElementById('contactoTelefono').value || null,
+        contacto_nombre: nombreContacto || null,
+        contacto_correo: correoContacto || null,  // ✅ Ahora envía null en vez de ""
+        contacto_telefono: telefonoContacto || null,
         activo: document.getElementById('estadoCliente').value === 'true'
     };
     
